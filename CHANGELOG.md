@@ -4,6 +4,13 @@ All notable changes to Loadout are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Versions use `MAJOR.MINOR.PATCH.MICRO`.
 
+## [0.2.0.1] - 2026-06-17
+
+### Fixed
+
+- Settings opens via `openWindow` instead of `openSettings` so LoadoutApp compiles on macOS 14 CI runners
+- Deprecated `onChange` usages updated for macOS 14 SDK
+
 ## [0.2.0.0] - 2026-06-17
 
 ### Added

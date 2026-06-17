@@ -170,8 +170,8 @@ struct ManageView: View {
                 model: model
             )
             .onAppear { syncDraftVariant(service: service, entry: entry) }
-            .onChange(of: service) { _ in syncDraftVariant(service: service, entry: entry) }
-            .onChange(of: entry.variants) { _ in syncDraftVariant(service: service, entry: entry) }
+            .onChange(of: service) { syncDraftVariant(service: service, entry: entry) }
+            .onChange(of: entry.variants) { syncDraftVariant(service: service, entry: entry) }
         } else {
             VStack(spacing: 8) {
                 Image(systemName: "sidebar.left")
@@ -266,7 +266,7 @@ private struct ManageServiceDetail: View {
                         Text(variant).tag(variant)
                     }
                 }
-                .onChange(of: draftVariant) { newValue in
+                .onChange(of: draftVariant) { _, newValue in
                     guard !newValue.isEmpty else { return }
                     model.select(service: entry.service, variant: newValue)
                 }

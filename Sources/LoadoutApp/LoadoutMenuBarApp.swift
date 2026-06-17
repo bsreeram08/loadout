@@ -18,8 +18,9 @@ struct LoadoutMenuBarApp: App {
         }
         .defaultSize(width: 560, height: 400)
 
-        Settings {
+        Window("Settings", id: "settings") {
             SettingsView(model: model)
         }
+        .defaultSize(width: 480, height: 360)
     }
 }
