@@ -54,6 +54,7 @@ private struct ServiceContext: Identifiable, Equatable {
     var id: String { service }
 }
 
+@MainActor
 struct ManageView: View {
     @Bindable var model: LoadoutMenuModel
     @State private var draftVariant = ""
@@ -191,7 +192,6 @@ struct ManageView: View {
         }
     }
 
-    @MainActor
     private func resolvedDraftVariant(for entry: RegistryEntry) -> String {
         if let selected = model.selectedVariant(for: entry.service),
            entry.variants.contains(selected)
@@ -206,12 +206,11 @@ struct ManageView: View {
 
     private func draftVariantBinding(for entry: RegistryEntry) -> Binding<String> {
         Binding(
-            get: { resolvedDraftVariant(for: entry) },
-            set: { draftVariant = $0 }
+            get: { @MainActor in resolvedDraftVariant(for: entry) },
+            set: { @MainActor in draftVariant = $0 }
         )
     }
 
-    @MainActor
     private func activeVariant(for service: String) -> String {
         guard let entry = model.registryEntry(for: service) else {
             return model.selectedVariant(for: service) ?? "prod"
@@ -222,7 +221,6 @@ struct ManageView: View {
             : variant
     }
 
-    @MainActor
     private func performDelete(_ target: DeleteConfirmation) {
         switch target {
         case .variable(let service, let variant, let name):
