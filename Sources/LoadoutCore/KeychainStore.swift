@@ -24,7 +24,7 @@ public struct KeychainStore: Sendable {
     public func deleteVariant(service: String, variant: String) throws -> Int {
         try NameValidator.validateService(service)
         try NameValidator.validateVariant(variant)
-        let names = try variableNames(service: service, variant: variant)
+        let names = try variableNames(service: service, variant: variant, catalog: nil)
         let serviceAttr = LoadoutPaths.keychainService(service: service, variant: variant)
         for name in names {
             try LoadoutKeychain.delete(service: serviceAttr, account: name)
@@ -35,7 +35,7 @@ public struct KeychainStore: Sendable {
     @discardableResult
     public func deleteService(_ service: String) throws -> Int {
         try NameValidator.validateService(service)
-        let entry = try registry().first { $0.service == service }
+        let entry = try registry(catalog: nil).first { $0.service == service }
         guard let entry else { return 0 }
         var deleted = 0
         for variant in entry.variants {
@@ -46,62 +46,51 @@ public struct KeychainStore: Sendable {
 
     public func get(service: String, variant: String, variable: String) throws -> String? {
         let serviceAttr = LoadoutPaths.keychainService(service: service, variant: variant)
+        return try readSecret(serviceAttr: serviceAttr, account: variable)
+    }
+
+    public func variables(service: String, variant: String, catalog: KeychainCatalog? = nil) throws -> [String: String] {
+        let index = try catalog ?? KeychainCatalog()
+        return try index.variables(service: service, variant: variant) { serviceAttr, account in
+            try readSecret(serviceAttr: serviceAttr, account: account)
+        }
+    }
+
+    private func readSecret(serviceAttr: String, account: String) throws -> String? {
         if ProcessInfo.processInfo.environment["LOADOUT_SKIP_PARTITION"] == "1" {
-            return try getViaSecItem(serviceAttr: serviceAttr, account: variable)
+            return try getViaSecItem(serviceAttr: serviceAttr, account: account)
         }
         try LoadoutKeychain.ensureReady()
-        return try LoadoutKeychain.readSecret(
+        if let value = try LoadoutKeychain.readSecret(
             keychain: LoadoutKeychain.path,
             service: serviceAttr,
-            account: variable
+            account: account
+        ) {
+            return value
+        }
+        return try LoadoutKeychain.readSecret(
+            keychain: LoadoutKeychain.loginPath,
+            service: serviceAttr,
+            account: account
         )
     }
 
-    public func variables(service: String, variant: String) throws -> [String: String] {
-        try LoadoutKeychain.ensureReady()
-        let serviceAttr = LoadoutPaths.keychainService(service: service, variant: variant)
-        let entries = try allLoadoutItems(includeData: false)
-            .filter { $0.serviceAttr == serviceAttr }
-
-        var result: [String: String] = [:]
-        for entry in entries {
-            if let value = try LoadoutKeychain.readSecret(
-                keychain: LoadoutKeychain.path,
-                service: serviceAttr,
-                account: entry.account
-            ) {
-                result[entry.account] = value
-            }
+    public func variableNames(
+        service: String,
+        variant: String,
+        catalog: KeychainCatalog? = nil
+    ) throws -> [String] {
+        if let catalog {
+            return catalog.variableNames(service: service, variant: variant)
         }
-        return result
+        return try KeychainCatalog().variableNames(service: service, variant: variant)
     }
 
-    public func variableNames(service: String, variant: String) throws -> [String] {
-        try LoadoutKeychain.ensureReady()
-        let serviceAttr = LoadoutPaths.keychainService(service: service, variant: variant)
-        return try allLoadoutItems(includeData: false)
-            .filter { $0.serviceAttr == serviceAttr }
-            .map(\.account)
-            .sorted()
-    }
-
-    public func registry() throws -> [RegistryEntry] {
-        try LoadoutKeychain.ensureReady()
-        let entries = try allLoadoutItems(includeData: false)
-        var grouped: [String: [String: Set<String>]] = [:]
-        for entry in entries {
-            grouped[entry.parsed.service, default: [:]][entry.parsed.variant, default: []]
-                .insert(entry.account)
+    public func registry(catalog: KeychainCatalog? = nil) throws -> [RegistryEntry] {
+        if let catalog {
+            return catalog.registry()
         }
-
-        return grouped.keys.sorted().map { service in
-            let variants = grouped[service] ?? [:]
-            let sortedVariants = variants.keys.sorted()
-            let counts = Dictionary(uniqueKeysWithValues: sortedVariants.map { variant in
-                (variant, variants[variant]?.count ?? 0)
-            })
-            return RegistryEntry(service: service, variants: sortedVariants, variableCounts: counts)
-        }
+        return try KeychainCatalog().registry()
     }
 
     public func accessPolicyDescription() throws -> String {

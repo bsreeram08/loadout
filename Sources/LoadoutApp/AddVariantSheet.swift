@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AddVariantSheet: View {
     let service: String
-    @ObservedObject var model: LoadoutMenuModel
+    let model: LoadoutMenuModel
     var onCreated: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -11,46 +11,41 @@ struct AddVariantSheet: View {
     @State private var variableValue = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Add variant")
-                .font(.headline)
-
-            Text("\(service) — variants need at least one variable.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            TextField("Variant name", text: $variantName)
-                .textFieldStyle(.roundedBorder)
-
-            TextField("Variable name", text: $variableName)
-                .textFieldStyle(.roundedBorder)
-
-            SecureField("Secret value", text: $variableValue)
-                .textFieldStyle(.roundedBorder)
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Create") {
-                    model.setVariable(
-                        service: service,
-                        variant: variantName,
-                        name: variableName,
-                        value: variableValue
-                    )
-                    onCreated(variantName)
-                    dismiss()
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Variant name", text: $variantName)
+                    TextField("Variable name", text: $variableName)
+                    SecureField("Secret value", text: $variableValue)
+                } footer: {
+                    Text("\(service) — variants need at least one variable.")
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(
-                    variantName.isEmpty
-                        || variableName.isEmpty
-                        || variableValue.isEmpty
-                )
+            }
+            .formStyle(.grouped)
+            .navigationTitle("Add variant")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        model.setVariable(
+                            service: service,
+                            variant: variantName,
+                            name: variableName,
+                            value: variableValue
+                        )
+                        onCreated(variantName)
+                        dismiss()
+                    }
+                    .disabled(
+                        variantName.isEmpty
+                            || variableName.isEmpty
+                            || variableValue.isEmpty
+                    )
+                }
             }
         }
-        .padding(20)
-        .frame(width: 380)
+        .frame(width: 420, height: 280)
     }
 }

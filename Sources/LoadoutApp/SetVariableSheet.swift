@@ -1,3 +1,4 @@
+import LoadoutCore
 import SwiftUI
 
 enum VariableSheetMode: Equatable {
@@ -9,11 +10,12 @@ struct SetVariableSheet: View {
     let service: String
     let variant: String
     let mode: VariableSheetMode
-    @ObservedObject var model: LoadoutMenuModel
+    let model: LoadoutMenuModel
 
     @Environment(\.dismiss) private var dismiss
     @State private var variableName = ""
     @State private var variableValue = ""
+    @State private var loadError: String?
 
     private var isEditing: Bool {
         if case .edit = mode { return true }
@@ -29,49 +31,68 @@ struct SetVariableSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(title)
-                .font(.headline)
-
-            Text("\(service) / \(variant)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            if isEditing {
-                LabeledContent("Name", value: variableName)
-            } else {
-                TextField("Variable name", text: $variableName)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            SecureField(isEditing ? "New secret value" : "Secret value", text: $variableValue)
-                .textFieldStyle(.roundedBorder)
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button(saveLabel) {
-                    let name = isEditing ? variableName : variableName
-                    model.setVariable(
-                        service: service,
-                        variant: variant,
-                        name: name,
-                        value: variableValue
-                    )
-                    dismiss()
+        NavigationStack {
+            Form {
+                if let loadError {
+                    Section {
+                        Text(loadError)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                    }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canSave)
+
+                Section {
+                    if isEditing {
+                        LabeledContent("Name", value: variableName)
+                    } else {
+                        TextField("Variable name", text: $variableName)
+                    }
+
+                    SecureField(isEditing ? "New secret value" : "Secret value", text: $variableValue)
+                } footer: {
+                    Text("\(service) / \(variant)")
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saveLabel) {
+                        model.setVariable(
+                            service: service,
+                            variant: variant,
+                            name: variableName,
+                            value: variableValue
+                        )
+                        dismiss()
+                    }
+                    .disabled(!canSave)
+                }
             }
         }
-        .padding(20)
-        .frame(width: 360)
-        .onAppear {
-            if case .edit(let name) = mode {
-                variableName = name
+        .frame(width: 400, height: 260)
+        .task(id: taskID) {
+            guard case .edit(let name) = mode else { return }
+            variableName = name
+            loadError = nil
+            do {
+                try await KeychainAuthenticator.authenticateForSecretAccess()
+                if let value = try model.variableValue(service: service, variant: variant, name: name) {
+                    variableValue = value
+                }
+            } catch {
+                if !KeychainAuthenticator.isUserCancellation(error) {
+                    loadError = error.localizedDescription
+                }
             }
         }
+    }
+
+    private var taskID: String {
+        "\(service):\(variant):\(mode)"
     }
 
     private var canSave: Bool {

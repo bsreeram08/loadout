@@ -9,12 +9,13 @@ public struct ExportEngine: Sendable {
         self.keychain = keychain
     }
 
-    public func export() throws -> ExportResult {
+    public func export(catalog: KeychainCatalog? = nil) throws -> ExportResult {
         let state = try stateStore.load()
         guard !state.selection.isEmpty else {
             return ExportResult(lines: [], warnings: [])
         }
 
+        let index = try catalog ?? KeychainCatalog()
         let orderedServices = orderedSelectionServices(state: state)
         var active: [String: String] = [:]
         var provenance: [String: String] = [:]
@@ -22,7 +23,7 @@ public struct ExportEngine: Sendable {
 
         for service in orderedServices {
             guard let variant = state.selection[service] else { continue }
-            let variables = try keychain.variables(service: service, variant: variant)
+            let variables = try keychain.variables(service: service, variant: variant, catalog: index)
             if variables.isEmpty {
                 warnings.append(
                     "loadout: skipping \(service)/\(variant) — no keychain items found"

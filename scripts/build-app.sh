@@ -6,7 +6,7 @@ BUILD_CONFIG="${BUILD_CONFIG:-release}"
 DIST="${ROOT}/dist"
 APP="${DIST}/Loadout.app"
 IDENTIFIER="${LOADOUT_BUNDLE_ID:-dev.loadout.app}"
-VERSION="${LOADOUT_VERSION:-0.2.0.1}"
+VERSION="${LOADOUT_VERSION:-$(cat "${ROOT}/VERSION" 2>/dev/null || echo 0.2.0.1)}"
 
 if [[ ! -f "${ROOT}/Assets/AppIcon.icns" ]]; then
   echo "generating icons..."

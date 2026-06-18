@@ -3,8 +3,9 @@ import LoadoutCore
 import SwiftUI
 
 struct LoadoutMenuView: View {
-    @ObservedObject var model: LoadoutMenuModel
+    @Bindable var model: LoadoutMenuModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Group {
@@ -13,13 +14,13 @@ struct LoadoutMenuView: View {
 
             Divider()
 
-            Button("Manage…") {
-                openWindow(id: "manage")
-                NSApp.activate(ignoringOtherApps: true)
+            Button("Manage services…") {
+                model.preferredWindowTab = .services
+                openMainWindow()
             }
 
             Button("Settings…") {
-                openWindow(id: "settings")
+                openSettings()
                 NSApp.activate(ignoringOtherApps: true)
             }
 
@@ -35,20 +36,18 @@ struct LoadoutMenuView: View {
                     model.showImportHint()
                 }
                 Divider()
-            } else if let registry = model.context?.registry,
-                      let state = model.context?.state
-            {
-                ForEach(registry, id: \.service) { entry in
-                    ServiceVariantMenu(
-                        entry: entry,
-                        selected: state.selection[entry.service],
-                        model: model
-                    )
-                }
+            } else {
+                activeSection
                 Divider()
             }
 
-            Text(model.context?.summary.footerLabel ?? "Loading…")
+            if model.hasProdSelected {
+                Label("Prod variant active", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+            }
+
+            Text(statusLine)
                 .foregroundStyle(.secondary)
 
             Button("Reload open terminals…") {
@@ -66,12 +65,53 @@ struct LoadoutMenuView: View {
             model.refresh()
         }
     }
+
+    @ViewBuilder
+    private var activeSection: some View {
+        let active = model.activeMenuEntries()
+        if active.isEmpty {
+            Text("No services active")
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(active) { item in
+                if let entry = item.entry {
+                    ServiceVariantMenu(
+                        entry: entry,
+                        selected: item.variant,
+                        model: model
+                    )
+                } else {
+                    MissingServiceMenu(
+                        service: item.service,
+                        variant: item.variant,
+                        model: model
+                    )
+                }
+            }
+        }
+    }
+
+    private var statusLine: String {
+        guard let context = model.context else { return "Loading…" }
+        let stored = context.registry.count
+        let summary = context.summary
+        if summary.selectedServiceCount == 0 {
+            let noun = stored == 1 ? "service" : "services"
+            return "\(stored) \(noun) stored, none active"
+        }
+        return summary.footerLabel
+    }
+
+    private func openMainWindow() {
+        openWindow(id: "loadout")
+        NSApp.activate(ignoringOtherApps: true)
+    }
 }
 
 private struct ServiceVariantMenu: View {
     let entry: RegistryEntry
     let selected: String?
-    @ObservedObject var model: LoadoutMenuModel
+    let model: LoadoutMenuModel
 
     private var statusLabel: String {
         guard let selected else { return "(off)" }
@@ -105,5 +145,19 @@ private struct ServiceVariantMenu: View {
         let count = entry.variableCounts[variant] ?? 0
         let noun = count == 1 ? "var" : "vars"
         return "\(check)\(variant) (\(count) \(noun))"
+    }
+}
+
+private struct MissingServiceMenu: View {
+    let service: String
+    let variant: String
+    let model: LoadoutMenuModel
+
+    var body: some View {
+        Menu("\(service)  \(variant) (missing)") {
+            Button("Turn off") {
+                model.deselect(service: service)
+            }
+        }
     }
 }

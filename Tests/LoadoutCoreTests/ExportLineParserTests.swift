@@ -34,6 +34,20 @@ final class ExportLineParserTests: XCTestCase {
         XCTAssertEqual(parsed, ParsedAssignment(variable: "FOO", value: "bar", lineNumber: 4))
     }
 
+    func testParsesEmptyQuotedValue() {
+        XCTAssertEqual(ExportLineParser.parseValue("\"\""), "")
+        XCTAssertEqual(ExportLineParser.parseValue("''"), "")
+    }
+
+    func testParsesUnquotedValueWithInlineComment() {
+        XCTAssertEqual(ExportLineParser.parseValue("8080 # default port"), "8080")
+    }
+
+    func testSkipsNonExportLines() {
+        XCTAssertNil(ExportLineParser.parseActiveExport(line: "echo hello", lineNumber: 1))
+        XCTAssertNil(ExportLineParser.parseActiveExport(line: "FOO=bar", lineNumber: 1))
+    }
+
     func testParsesZshCString() {
         let parsed = ExportLineParser.parseExport(
             line: #"export MSG=$'line1\nline2'"#,

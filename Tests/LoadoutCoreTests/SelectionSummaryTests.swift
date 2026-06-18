@@ -25,6 +25,24 @@ final class SelectionSummaryTests: XCTestCase {
         XCTAssertEqual(summary.footerLabel, "2 services selected · 3 vars")
     }
 
+    func testFooterLabelUsesSingularNouns() {
+        let summary = SelectionSummary(
+            selectedServiceCount: 1,
+            selectedVariableCount: 1,
+            hasProdSelected: false
+        )
+        XCTAssertEqual(summary.footerLabel, "1 service selected · 1 var")
+    }
+
+    func testFooterLabelUsesPluralNouns() {
+        let summary = SelectionSummary(
+            selectedServiceCount: 2,
+            selectedVariableCount: 5,
+            hasProdSelected: true
+        )
+        XCTAssertEqual(summary.footerLabel, "2 services selected · 5 vars")
+    }
+
     func testMissingVariantCountsAsZero() {
         let state = LoadoutState(selection: ["worldline": "staging"])
         let summary = SelectionSummary.compute(state: state, registry: registry)

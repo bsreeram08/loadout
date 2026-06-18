@@ -1,3 +1,4 @@
+import AppKit
 import LoadoutCore
 import SwiftUI
 
@@ -40,13 +41,26 @@ private enum DeleteConfirmation: Identifiable {
     }
 }
 
+private struct ServiceVariantContext: Identifiable, Equatable {
+    let service: String
+    let variant: String
+
+    var id: String { "\(service):\(variant)" }
+}
+
+private struct ServiceContext: Identifiable, Equatable {
+    let service: String
+
+    var id: String { service }
+}
+
 struct ManageView: View {
-    @ObservedObject var model: LoadoutMenuModel
+    @Bindable var model: LoadoutMenuModel
     @State private var draftVariant = ""
-    @State private var showingAddVariable = false
-    @State private var editingVariable: EditingVariable?
+    @State private var addVariableContext: ServiceVariantContext?
+    @State private var editVariableContext: EditVariableContext?
     @State private var showingAddService = false
-    @State private var showingAddVariant = false
+    @State private var addVariantContext: ServiceContext?
     @State private var deleteConfirmation: DeleteConfirmation?
 
     var body: some View {
@@ -69,8 +83,6 @@ struct ManageView: View {
         } detail: {
             detailPane
         }
-        .frame(minWidth: 520, minHeight: 360)
-        .onAppear { model.refresh() }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -90,31 +102,25 @@ struct ManageView: View {
         .sheet(isPresented: $showingAddService) {
             AddServiceSheet(model: model)
         }
-        .sheet(isPresented: $showingAddVariable) {
-            if let service = model.manageSelection {
-                SetVariableSheet(
-                    service: service,
-                    variant: activeVariant(for: service),
-                    mode: .add,
-                    model: model
-                )
-            }
+        .sheet(item: $addVariableContext) { context in
+            SetVariableSheet(
+                service: context.service,
+                variant: context.variant,
+                mode: .add,
+                model: model
+            )
         }
-        .sheet(item: $editingVariable) { item in
-            if let service = model.manageSelection {
-                SetVariableSheet(
-                    service: service,
-                    variant: activeVariant(for: service),
-                    mode: .edit(name: item.name),
-                    model: model
-                )
-            }
+        .sheet(item: $editVariableContext) { context in
+            SetVariableSheet(
+                service: context.service,
+                variant: context.variant,
+                mode: .edit(name: context.name),
+                model: model
+            )
         }
-        .sheet(isPresented: $showingAddVariant) {
-            if let service = model.manageSelection {
-                AddVariantSheet(service: service, model: model) { created in
-                    draftVariant = created
-                }
+        .sheet(item: $addVariantContext) { context in
+            AddVariantSheet(service: context.service, model: model) { created in
+                draftVariant = created
             }
         }
         .confirmationDialog(
@@ -144,10 +150,8 @@ struct ManageView: View {
     @ViewBuilder
     private var detailPane: some View {
         if let error = model.context?.errorMessage {
-            VStack(spacing: 8) {
-                Image(systemName: "lock.slash")
-                    .font(.largeTitle)
-                    .foregroundStyle(.secondary)
+            VStack(spacing: 12) {
+                GlassIconBadge(systemImage: "lock.slash", size: 56)
                 Text("Keychain error")
                     .font(.headline)
                 Text(error)
@@ -162,21 +166,30 @@ struct ManageView: View {
             ManageServiceDetail(
                 entry: entry,
                 selectedVariant: model.selectedVariant(for: service),
-                draftVariant: $draftVariant,
-                showingAddVariable: $showingAddVariable,
-                showingAddVariant: $showingAddVariant,
-                editingVariable: $editingVariable,
+                draftVariant: draftVariantBinding(for: entry),
+                onAddVariable: {
+                    addVariableContext = ServiceVariantContext(
+                        service: entry.service,
+                        variant: resolvedDraftVariant(for: entry)
+                    )
+                },
+                onAddVariant: {
+                    addVariantContext = ServiceContext(service: entry.service)
+                },
+                onEditVariable: { name in
+                    editVariableContext = EditVariableContext(
+                        service: entry.service,
+                        variant: resolvedDraftVariant(for: entry),
+                        name: name
+                    )
+                },
                 deleteConfirmation: $deleteConfirmation,
                 model: model
             )
-            .onAppear { syncDraftVariant(service: service, entry: entry) }
-            .onChange(of: service) { syncDraftVariant(service: service, entry: entry) }
-            .onChange(of: entry.variants) { syncDraftVariant(service: service, entry: entry) }
+            .id(service)
         } else {
-            VStack(spacing: 8) {
-                Image(systemName: "sidebar.left")
-                    .font(.largeTitle)
-                    .foregroundStyle(.secondary)
+            VStack(spacing: 12) {
+                GlassIconBadge(systemImage: "sidebar.left", size: 56)
                 Text("Select a service")
                     .font(.headline)
                 Text("Choose a service to manage variants and variables.")
@@ -185,31 +198,39 @@ struct ManageView: View {
                 Button("Add service…") {
                     showingAddService = true
                 }
+                .modifier(GlassButtonModifier())
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    private func syncDraftVariant(service: String, entry: RegistryEntry) {
-        if let selected = model.selectedVariant(for: service),
+    private func resolvedDraftVariant(for entry: RegistryEntry) -> String {
+        if let selected = model.selectedVariant(for: entry.service),
            entry.variants.contains(selected)
         {
-            draftVariant = selected
-        } else if entry.variants.contains(draftVariant) {
-            return
-        } else {
-            draftVariant = entry.variants.first ?? ""
+            return selected
         }
+        if entry.variants.contains(draftVariant) {
+            return draftVariant
+        }
+        return entry.variants.first ?? ""
+    }
+
+    private func draftVariantBinding(for entry: RegistryEntry) -> Binding<String> {
+        Binding(
+            get: { resolvedDraftVariant(for: entry) },
+            set: { draftVariant = $0 }
+        )
     }
 
     private func activeVariant(for service: String) -> String {
-        let entry = model.registryEntry(for: service)
-        if entry?.variants.contains(draftVariant) == true {
-            return draftVariant
+        guard let entry = model.registryEntry(for: service) else {
+            return model.selectedVariant(for: service) ?? "prod"
         }
-        return model.selectedVariant(for: service)
-            ?? entry?.variants.first
-            ?? "prod"
+        let variant = resolvedDraftVariant(for: entry)
+        return variant.isEmpty
+            ? (model.selectedVariant(for: service) ?? entry.variants.first ?? "prod")
+            : variant
     }
 
     private func performDelete(_ target: DeleteConfirmation) {
@@ -252,23 +273,28 @@ private struct ManageServiceDetail: View {
     let entry: RegistryEntry
     let selectedVariant: String?
     @Binding var draftVariant: String
-    @Binding var showingAddVariable: Bool
-    @Binding var showingAddVariant: Bool
-    @Binding var editingVariable: EditingVariable?
+    let onAddVariable: () -> Void
+    let onAddVariant: () -> Void
+    let onEditVariable: (String) -> Void
     @Binding var deleteConfirmation: DeleteConfirmation?
-    @ObservedObject var model: LoadoutMenuModel
+    let model: LoadoutMenuModel
 
     var body: some View {
         Form {
             Section("Selection") {
-                Picker("Variant", selection: $draftVariant) {
-                    ForEach(entry.variants, id: \.self) { variant in
-                        Text(variant).tag(variant)
+                if entry.variants.isEmpty {
+                    Text("No variants stored for this service.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Variant", selection: $draftVariant) {
+                        ForEach(entry.variants, id: \.self) { variant in
+                            Text(variant).tag(variant)
+                        }
                     }
-                }
-                .onChange(of: draftVariant) { _, newValue in
-                    guard !newValue.isEmpty else { return }
-                    model.select(service: entry.service, variant: newValue)
+                    .onChange(of: draftVariant) { _, newValue in
+                        guard !newValue.isEmpty, selectedVariant != nil else { return }
+                        model.select(service: entry.service, variant: newValue)
+                    }
                 }
 
                 Toggle(
@@ -311,9 +337,7 @@ private struct ManageServiceDetail: View {
                         }
                     }
                 }
-                Button("Add variant…") {
-                    showingAddVariant = true
-                }
+                Button("Add variant…", action: onAddVariant)
             }
 
             Section("Variables (\(draftVariant))") {
@@ -323,39 +347,23 @@ private struct ManageServiceDetail: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(names, id: \.self) { name in
-                        HStack {
-                            Label(name, systemImage: "key")
-                            Spacer()
-                            Button("Edit") {
-                                editingVariable = EditingVariable(name: name)
-                            }
-                            .buttonStyle(.borderless)
-                            Button(role: .destructive) {
-                                deleteConfirmation = .variable(
-                                    service: entry.service,
-                                    variant: draftVariant,
-                                    name: name
-                                )
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                        .contextMenu {
-                            Button("Edit…") { editingVariable = EditingVariable(name: name) }
-                            Button("Delete", role: .destructive) {
+                        VariableRow(
+                            name: name,
+                            service: entry.service,
+                            variant: draftVariant,
+                            model: model,
+                            onEdit: { onEditVariable(name) },
+                            onDelete: {
                                 deleteConfirmation = .variable(
                                     service: entry.service,
                                     variant: draftVariant,
                                     name: name
                                 )
                             }
-                        }
+                        )
                     }
                 }
-                Button("Add variable…") {
-                    showingAddVariable = true
-                }
+                Button("Add variable…", action: onAddVariable)
             }
 
             Section {
@@ -369,7 +377,158 @@ private struct ManageServiceDetail: View {
     }
 }
 
-private struct EditingVariable: Identifiable {
+private struct EditVariableContext: Identifiable, Equatable {
+    let service: String
+    let variant: String
     let name: String
-    var id: String { name }
+
+    var id: String { "\(service):\(variant):\(name)" }
+}
+
+private struct VariableRow: View {
+    let name: String
+    let service: String
+    let variant: String
+    let model: LoadoutMenuModel
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+
+    @State private var isRevealed = false
+    @State private var revealedValue: String?
+    @State private var loadError: String?
+    @State private var isLoading = false
+
+    var body: some View {
+        LabeledContent {
+            HStack(spacing: 8) {
+                Button {
+                    toggleReveal()
+                } label: {
+                    Image(systemName: isRevealed ? "eye.slash" : "eye")
+                }
+                .buttonStyle(.borderless)
+                .help(isRevealed ? "Hide value" : "Show value")
+                .accessibilityLabel(isRevealed ? "Hide value" : "Show value")
+                .accessibilityHint("Requires authentication")
+                .disabled(isLoading)
+
+                if isRevealed, revealedValue != nil {
+                    Button(action: copyValue) {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Copy value")
+                    .accessibilityLabel("Copy value")
+                }
+
+                Button("Edit", action: onEdit)
+                    .buttonStyle(.borderless)
+
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help("Delete variable")
+                .accessibilityLabel("Delete variable")
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name)
+                    .font(.body)
+                Text(valueLabel)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .foregroundStyle(valueColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .contextMenu {
+            Button(isRevealed ? "Hide value" : "Show value") { toggleReveal() }
+            if isRevealed, revealedValue != nil {
+                Button("Copy value", action: copyValue)
+            }
+            Button("Edit…", action: onEdit)
+            Button("Delete", role: .destructive, action: onDelete)
+        }
+        .onChange(of: variant) { _, _ in
+            hideValue()
+        }
+    }
+
+    private var valueLabel: String {
+        if !isRevealed {
+            return "••••••••"
+        }
+        if isLoading {
+            return "Loading…"
+        }
+        if let loadError {
+            return loadError
+        }
+        guard let revealedValue else {
+            return "No value stored in Keychain."
+        }
+        if revealedValue.isEmpty {
+            return "(empty value)"
+        }
+        return revealedValue
+    }
+
+    private var valueColor: Color {
+        if loadError != nil {
+            return .red
+        }
+        if !isRevealed {
+            return Color(nsColor: .tertiaryLabelColor)
+        }
+        return .secondary
+    }
+
+    private func toggleReveal() {
+        if isRevealed {
+            hideValue()
+            return
+        }
+        if revealedValue != nil {
+            isRevealed = true
+            return
+        }
+
+        isLoading = true
+        loadError = nil
+        Task {
+            do {
+                try await KeychainAuthenticator.authenticateForSecretAccess()
+                let value = try model.variableValue(service: service, variant: variant, name: name)
+                revealedValue = value ?? ""
+                if value == nil {
+                    loadError = "Could not read value. Unlock the loadout keychain and try again."
+                    isRevealed = false
+                } else {
+                    isRevealed = true
+                }
+            } catch {
+                if KeychainAuthenticator.isUserCancellation(error) {
+                    hideValue()
+                } else {
+                    loadError = error.localizedDescription
+                    isRevealed = false
+                }
+            }
+            isLoading = false
+        }
+    }
+
+    private func hideValue() {
+        isRevealed = false
+        revealedValue = nil
+        loadError = nil
+        isLoading = false
+    }
+
+    private func copyValue() {
+        guard let revealedValue else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(revealedValue, forType: .string)
+    }
 }

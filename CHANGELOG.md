@@ -4,6 +4,26 @@ All notable changes to Loadout are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Versions use `MAJOR.MINOR.PATCH.MICRO`.
 
+## [0.2.0.2] - 2026-06-19
+
+### Added
+
+- **67-test suite** — CLI subprocess, Keychain integration, catalog dump, paths, state store, and name validator coverage
+- **KeychainCatalog** — single keychain scan indexed for registry and per-variant lookups
+- **Main window** — Services / Export / About tabs with Liquid Glass styling on macOS 26+
+- **Compact menu bar** — only active services shown; full catalog via Manage services…
+
+### Changed
+
+- Menu bar dropdown no longer lists every stored service when inactive
+- `install.sh` defaults to release builds and resolves arch-specific binary paths
+- `build-app.sh` reads version from `VERSION` file
+
+### Fixed
+
+- Keychain writes use real `security add-generic-password -w` path (empty-password bug)
+- Integration tests use dedicated temp keychain via `LOADOUT_KEYCHAIN_PATH`
+
 ## [0.2.0.1] - 2026-06-17
 
 ### Fixed

@@ -2,10 +2,18 @@
 
 Local-first macOS tool for **per-service environment profiles**. Toggle each service's variant independently (e.g. Worldline → prod, Bambora → test), keep secrets encrypted in the macOS Keychain, and load the active set into new terminal sessions.
 
+**Current version:** `0.2.0.2`
+
 ```
-Worldline  prod  ▸  dev | ✓ prod
-Bambora    test  ▸  ✓ test | prod
-Swish      (off) ▸  prod | test
+Menu bar (compact)          Main window (full catalog)
+─────────────────          ──────────────────────────
+Loadout                    Services | Export | About
+Manage services…           [sidebar: all services]
+Settings…                  [detail: variants, variables]
+─────────────
+aws  prod                  Toggle, edit, add, delete
+─────────────
+52 services stored, 1 active
 ```
 
 ## Why
@@ -16,10 +24,13 @@ If your `~/.zshrc` is a wall of commented/uncommented `export` blocks across dev
 
 - **Independent per-service selection** — mix prod and test across services
 - **CLI + menu bar app** — `loadout` for scripts/CI; GUI for day-to-day toggling
+- **Compact menu bar** — only active services in the dropdown; full list in the main window
+- **Main window** — Services, Export preview, and About tabs (Liquid Glass on macOS 26+)
 - **Dedicated Keychain** (`~/Library/Keychains/loadout.keychain-db`) — survives rebuilds without ACL repair
 - **Import wizard** — one-time migration from `~/.zshrc`
 - **Manage UI** — CRUD for services, variants, and variables
 - **Opt-in export** — nothing exports until you explicitly select a service
+- **67 tests** — unit, integration, and CLI subprocess coverage against real temp keychains
 
 ## Requirements
 
@@ -37,7 +48,7 @@ cd loadout
 ./scripts/install.sh
 ```
 
-Adds `loadout` to `~/.local/bin`. Ensure that directory is on your `PATH`.
+Adds `loadout` to `~/.local/bin` (release build by default). Ensure that directory is on your `PATH`.
 
 ### Menu bar app
 
@@ -47,7 +58,7 @@ cp -R dist/Loadout.app /Applications/
 open /Applications/Loadout.app
 ```
 
-The app bundles the CLI and installs it to `~/.local/bin` on first launch if missing.
+The app bundles the CLI and installs it to `~/.local/bin` on first launch if missing or older.
 
 ### Shell hook
 
@@ -82,7 +93,16 @@ loadout export
 loadout status
 ```
 
-Click the menu-bar icon to toggle variants, open **Manage…** for CRUD, or **Settings…** for paths, collision order, and export preview.
+### Menu bar app
+
+Click the menu-bar icon for a short status menu:
+
+- **Manage services…** — open the main window (full service list, CRUD)
+- **Settings…** — general preferences and storage paths
+- **Active services only** — quick variant toggle for what's exporting
+- Summary line when nothing is active, e.g. `52 services stored, none active`
+
+Use **Manage services…** to turn services on/off when you have many stored profiles.
 
 ## CLI reference
 
@@ -113,17 +133,19 @@ Click the menu-bar icon to toggle variants, open **Manage…** for CRUD, or **Se
 ## Development
 
 ```bash
-swift test                    # 27 unit tests
+swift test                    # 67 tests (unit + integration + CLI)
 swift build                   # CLI only
 ./scripts/build-app.sh        # Loadout.app → dist/
 BUILD_CONFIG=debug ./scripts/install.sh
 ```
 
+Integration tests use a dedicated temp keychain via `LOADOUT_KEYCHAIN_PATH`. CI builds the CLI first so subprocess tests can exercise the real binary.
+
 ## Architecture
 
-- **LoadoutCore** — Keychain, state, export engine, import parser
+- **LoadoutCore** — Keychain, KeychainCatalog, state, export engine, import parser
 - **loadout** — CLI ([swift-argument-parser](https://github.com/apple/swift-argument-parser))
-- **LoadoutApp** — SwiftUI menu-bar app (MenuBarExtra + Manage/Settings windows)
+- **LoadoutApp** — SwiftUI menu-bar app (MenuBarExtra + main window + Settings)
 
 See [CONTEXT.md](CONTEXT.md) for domain language, [SPEC-macos.md](SPEC-macos.md) for the full spec, and [docs/adr/](docs/adr/) for architecture decisions.
 
@@ -133,6 +155,7 @@ See [CONTEXT.md](CONTEXT.md) for domain language, [SPEC-macos.md](SPEC-macos.md)
 |-----------|--------|
 | M1 — CLI core | Done |
 | M2 — Menu bar app | Done |
+| M2.1 — Compact menu + main window | Done (v0.2.0.2) |
 | M3 — Touch-ID editor + import GUI | Planned |
 | M4 — Collision UI polish, prod cues | Planned |
 
