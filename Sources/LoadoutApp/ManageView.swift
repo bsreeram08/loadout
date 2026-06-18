@@ -81,19 +81,26 @@ struct ManageView: View {
                 onRefresh: { model.refresh() }
             )
         ) {
-            List(selection: $model.manageSelection) {
+            ScrollView {
+                VStack(spacing: 6) {
                 if let registry = model.context?.registry, !registry.isEmpty {
                     ForEach(registry, id: \.service) { entry in
-                        ManageServiceRow(
+                            Button {
+                                model.manageSelection = entry.service
+                            } label: {
+                                ManageServiceRow(
                             service: entry.service,
-                            selectedVariant: model.selectedVariant(for: entry.service)
+                                    selectedVariant: model.selectedVariant(for: entry.service),
+                                    isSelected: model.manageSelection == entry.service
                         )
-                        .tag(entry.service)
+                            }
+                            .buttonStyle(.plain)
                     }
                 } else {
                     Text("No services — import from .zshrc or add one.")
                         .foregroundStyle(.secondary)
                 }
+            }
             }
         } detail: {
             detailPane
@@ -234,10 +241,12 @@ struct ManageView: View {
 private struct ManageServiceRow: View {
     let service: String
     let selectedVariant: String?
+    let isSelected: Bool
 
     var body: some View {
         HStack {
             Text(service)
+                .fontWeight(isSelected ? .semibold : .regular)
             Spacer()
             if let selectedVariant {
                 Text(selectedVariant)
@@ -252,6 +261,13 @@ private struct ManageServiceRow: View {
                     .foregroundStyle(.tertiary)
             }
         }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            isSelected ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.55) : .clear,
+            in: RoundedRectangle(cornerRadius: 8)
+        )
     }
 }
 
@@ -276,13 +292,25 @@ private struct ManageServiceDetail: View {
         model.variableNames(service: entry.service, variant: draftVariant)
     }
 
+    private var isSelectedForExport: Bool {
+        selectedVariant != nil
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            LoadoutTabHeader(title: entry.service, subtitle: detailSubtitle)
-            Divider()
-            LoadoutTabContent {
-                LoadoutGroupedForm {
-                    Section("Selection") {
+        ScrollView {
+            VStack(alignment: .leading, spacing: LoadoutChrome.cardSpacing) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.service)
+                            .font(.title3.weight(.semibold))
+                        Text(detailSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+
+                LoadoutCardSection(title: "Selection") {
                         if entry.variants.isEmpty {
                             Text("No variants stored for this service.")
                                 .foregroundStyle(.secondary)
@@ -294,16 +322,37 @@ private struct ManageServiceDetail: View {
                             }
                             .onChange(of: draftVariant) { _, newValue in
                                 Task { @MainActor in
-                                    guard !newValue.isEmpty, selectedVariant != nil else { return }
+                                    guard !newValue.isEmpty, isSelectedForExport else { return }
                                     model.select(service: entry.service, variant: newValue)
+                                }
+                            }
+
+                            if isSelectedForExport {
+                                Text("Changing the Variant updates the Selection immediately.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label(
+                                        "Browsing stored variables only. This Service is not part of the Active set yet.",
+                                        systemImage: "info.circle"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                    Button("Select \(draftVariant) for export") {
+                                        model.select(service: entry.service, variant: draftVariant)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(draftVariant.isEmpty)
                                 }
                             }
                         }
 
                         Toggle(
-                            "Active in export",
+                            "Include in Active set",
                             isOn: Binding(
-                                get: { selectedVariant != nil },
+                                get: { isSelectedForExport },
                                 set: { active in
                                     if active {
                                         model.select(service: entry.service, variant: draftVariant)
@@ -319,11 +368,11 @@ private struct ManageServiceDetail: View {
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                         }
-                    }
+                }
 
-                    Section("Variants") {
+                LoadoutCardSection(title: "Variants") {
                         ForEach(entry.variants, id: \.self) { variant in
-                            HStack {
+                        LoadoutRow {
                                 Text(variant)
                                 Spacer()
                                 Text("\(entry.variableCounts[variant] ?? 0) vars")
@@ -341,9 +390,9 @@ private struct ManageServiceDetail: View {
                             }
                         }
                         Button("Add variant…", action: onAddVariant)
-                    }
+                }
 
-                    Section("Variables (\(draftVariant))") {
+                LoadoutCardSection(title: "Variables", subtitle: draftVariant) {
                         if variableNames.isEmpty {
                             Text("No variables stored for this variant.")
                                 .foregroundStyle(.secondary)
@@ -366,15 +415,13 @@ private struct ManageServiceDetail: View {
                             }
                         }
                         Button("Add variable…", action: onAddVariable)
-                    }
+                }
 
-                    Section {
+                LoadoutCardSection(title: "Danger zone") {
                         Button("Delete service…", role: .destructive) {
                             deleteConfirmation = .service(entry.service)
                         }
-                    }
                 }
-                .padding(LoadoutChrome.contentPadding)
             }
         }
     }
@@ -407,11 +454,11 @@ private struct VariableRow: View {
                 Button {
                     toggleReveal()
                 } label: {
-                    Image(systemName: isRevealed ? "eye.slash" : "eye")
+                    Image(systemName: revealIconName)
                 }
                 .buttonStyle(.borderless)
-                .help(isRevealed ? "Hide value" : "Show value")
-                .accessibilityLabel(isRevealed ? "Hide value" : "Show value")
+                .help(revealActionLabel)
+                .accessibilityLabel(revealActionLabel)
                 .accessibilityHint("Requires authentication")
                 .disabled(isLoading)
 
@@ -446,7 +493,7 @@ private struct VariableRow: View {
             }
         }
         .contextMenu {
-            Button(isRevealed ? "Hide value" : "Show value") { toggleReveal() }
+            Button(revealActionLabel) { toggleReveal() }
             if isRevealed, revealedValue != nil {
                 Button("Copy value", action: copyValue)
             }
@@ -487,10 +534,28 @@ private struct VariableRow: View {
         return .secondary
     }
 
+    private var revealActionLabel: String {
+        if isRevealed, loadError != nil, revealedValue == nil {
+            return "Retry reveal"
+        }
+        return isRevealed ? "Hide value" : "Show value"
+    }
+
+    private var revealIconName: String {
+        if isRevealed, loadError != nil, revealedValue == nil {
+            return "arrow.clockwise"
+        }
+        return isRevealed ? "eye.slash" : "eye"
+    }
+
     private func toggleReveal() {
         if isRevealed {
-            hideValue()
-            return
+            if loadError != nil, revealedValue == nil {
+                hideValue()
+            } else {
+                hideValue()
+                return
+            }
         }
         if revealedValue != nil {
             isRevealed = true
@@ -520,10 +585,13 @@ private struct VariableRow: View {
             } catch {
                 await MainActor.run {
                     if KeychainAuthenticator.isUserCancellation(error) {
-                        hideValue()
+                        loadError = "Authentication cancelled. Retry reveal and authenticate to show this value."
+                        isRevealed = true
+                        revealedValue = nil
                     } else {
                         loadError = error.localizedDescription
-                        isRevealed = false
+                        isRevealed = true
+                        revealedValue = nil
                     }
                     isLoading = false
                 }

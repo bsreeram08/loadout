@@ -3,10 +3,12 @@ import SwiftUI
 
 enum LoadoutChrome {
     static let contentPadding: CGFloat = 16
+    static let cardSpacing: CGFloat = 12
     static let placeholderMarkSize: CGFloat = 56
     static let headerMarkSize: CGFloat = 22
     static let sidebarMinWidth: CGFloat = 160
     static let sidebarIdealWidth: CGFloat = 180
+    static let sidebarMaxWidth: CGFloat = 220
 }
 
 struct LoadoutMark: View {
@@ -129,6 +131,7 @@ struct LoadoutTabContent<Content: View>: View {
     var body: some View {
         content()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(LoadoutChrome.contentPadding)
     }
 }
 
@@ -136,9 +139,8 @@ struct LoadoutGroupedForm<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        Form(content: content)
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
+        VStack(alignment: .leading, spacing: LoadoutChrome.cardSpacing, content: content)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
@@ -147,17 +149,22 @@ struct LoadoutTabLayout<Sidebar: View, Detail: View>: View {
     @ViewBuilder let detail: () -> Detail
 
     var body: some View {
-        NavigationSplitView {
-            sidebar()
-                .navigationSplitViewColumnWidth(
-                    min: LoadoutChrome.sidebarMinWidth,
-                    ideal: LoadoutChrome.sidebarIdealWidth
-                )
-        } detail: {
+        HStack(alignment: .top, spacing: LoadoutChrome.cardSpacing) {
+            LoadoutCard(padding: 8) {
+                sidebar()
+            }
+            .frame(
+                minWidth: LoadoutChrome.sidebarMinWidth,
+                idealWidth: LoadoutChrome.sidebarIdealWidth,
+                maxWidth: LoadoutChrome.sidebarMaxWidth,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
+
             detail()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .navigationSplitViewStyle(.balanced)
+        .padding(LoadoutChrome.contentPadding)
     }
 }
 
@@ -174,6 +181,7 @@ struct LoadoutTabShell<Content: View>: View {
             Divider()
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(Color(nsColor: .windowBackgroundColor))
         }
     }
 }
@@ -219,6 +227,54 @@ struct LoadoutPlaceholderState: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(LoadoutChrome.contentPadding * 2)
+    }
+}
+
+struct LoadoutCard<Content: View>: View {
+    var padding: CGFloat = 14
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .glassSurface(cornerRadius: 12)
+    }
+}
+
+struct LoadoutCardSection<Content: View>: View {
+    let title: String
+    var subtitle: String?
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        LoadoutCard {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                content()
+            }
+        }
+    }
+}
+
+struct LoadoutRow<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10, content: content)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
