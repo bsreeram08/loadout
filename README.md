@@ -25,7 +25,7 @@ If your `~/.zshrc` is a wall of commented/uncommented `export` blocks across dev
 - **Independent per-service selection** — mix prod and test across services
 - **CLI + menu bar app** — `loadout` for scripts/CI; GUI for day-to-day toggling
 - **Compact menu bar** — only active services in the dropdown; full list in the main window
-- **Main window** — Services, Export preview, and About tabs (Liquid Glass on macOS 26+)
+- **Main window** — Services, Export preview, Settings, and About tabs
 - **Dedicated Keychain** (`~/Library/Keychains/loadout.keychain-db`) — survives rebuilds without ACL repair
 - **Import wizard** — one-time migration from `~/.zshrc`
 - **Manage UI** — CRUD for services, variants, and variables
