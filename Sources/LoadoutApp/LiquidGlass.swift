@@ -46,13 +46,3 @@ struct GlassSegmentedPicker<Option: Hashable & Identifiable>: View {
     }
 }
 
-struct GlassCodePanel<Content: View>: View {
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        content()
-            .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .glassSurface(cornerRadius: 10)
-    }
-}

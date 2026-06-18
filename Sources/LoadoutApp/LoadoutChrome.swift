@@ -5,6 +5,8 @@ enum LoadoutChrome {
     static let contentPadding: CGFloat = 16
     static let placeholderMarkSize: CGFloat = 56
     static let headerMarkSize: CGFloat = 22
+    static let sidebarMinWidth: CGFloat = 160
+    static let sidebarIdealWidth: CGFloat = 180
 }
 
 struct LoadoutMark: View {
@@ -73,6 +75,123 @@ struct LoadoutWindowHeader: View {
     }
 }
 
+struct LoadoutTabActions {
+    var addTitle: String?
+    var onAdd: (() -> Void)?
+    var onRefresh: (() -> Void)?
+}
+
+struct LoadoutTabHeader: View {
+    let title: String
+    var subtitle: String?
+    var actions: LoadoutTabActions?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            if let actions {
+                HStack(spacing: 8) {
+                    if let onRefresh = actions.onRefresh {
+                        Button(action: onRefresh) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .help("Refresh")
+                    }
+                    if let addTitle = actions.addTitle, let onAdd = actions.onAdd {
+                        Button(action: onAdd) {
+                            Label(addTitle, systemImage: "plus")
+                        }
+                    }
+                }
+                .buttonStyle(.borderless)
+                .labelStyle(.titleAndIcon)
+            }
+        }
+        .padding(.horizontal, LoadoutChrome.contentPadding)
+        .padding(.vertical, 12)
+    }
+}
+
+struct LoadoutTabContent<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct LoadoutGroupedForm<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Form(content: content)
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+    }
+}
+
+struct LoadoutTabLayout<Sidebar: View, Detail: View>: View {
+    @ViewBuilder let sidebar: () -> Sidebar
+    @ViewBuilder let detail: () -> Detail
+
+    var body: some View {
+        NavigationSplitView {
+            sidebar()
+                .navigationSplitViewColumnWidth(
+                    min: LoadoutChrome.sidebarMinWidth,
+                    ideal: LoadoutChrome.sidebarIdealWidth
+                )
+        } detail: {
+            detail()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+}
+
+/// Full-width tab: header, divider, then either split or single content.
+struct LoadoutTabShell<Content: View>: View {
+    let title: String
+    var subtitle: String?
+    var actions: LoadoutTabActions?
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            LoadoutTabHeader(title: title, subtitle: subtitle, actions: actions)
+            Divider()
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+}
+
+struct LoadoutSplitTabShell<Sidebar: View, Detail: View>: View {
+    let title: String
+    var subtitle: String?
+    var actions: LoadoutTabActions?
+    @ViewBuilder let sidebar: () -> Sidebar
+    @ViewBuilder let detail: () -> Detail
+
+    var body: some View {
+        LoadoutTabShell(title: title, subtitle: subtitle, actions: actions) {
+            LoadoutTabLayout(sidebar: sidebar, detail: detail)
+        }
+    }
+}
+
 struct LoadoutPlaceholderState: View {
     let title: String
     let message: String
@@ -103,18 +222,14 @@ struct LoadoutPlaceholderState: View {
     }
 }
 
-struct LoadoutPanelScaffold<Header: View, Content: View>: View {
-    @ViewBuilder let header: () -> Header
+struct LoadoutCodePanel<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header()
-            content()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .padding(LoadoutChrome.contentPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        content()
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .glassSurface(cornerRadius: 10)
     }
 }
 

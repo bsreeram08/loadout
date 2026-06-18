@@ -64,8 +64,23 @@ struct ManageView: View {
     @State private var addVariantContext: ServiceContext?
     @State private var deleteConfirmation: DeleteConfirmation?
 
+    private var servicesSubtitle: String {
+        if let error = model.context?.errorMessage {
+            return error
+        }
+        return model.context?.summary.footerLabel ?? ""
+    }
+
     var body: some View {
-        NavigationSplitView {
+        LoadoutSplitTabShell(
+            title: "Services",
+            subtitle: servicesSubtitle,
+            actions: LoadoutTabActions(
+                addTitle: "Add service",
+                onAdd: { showingAddService = true },
+                onRefresh: { model.refresh() }
+            )
+        ) {
             List(selection: $model.manageSelection) {
                 if let registry = model.context?.registry, !registry.isEmpty {
                     ForEach(registry, id: \.service) { entry in
@@ -80,25 +95,8 @@ struct ManageView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180)
         } detail: {
             detailPane
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingAddService = true
-                } label: {
-                    Label("Add Service", systemImage: "plus")
-                }
-            }
-            ToolbarItem {
-                Button {
-                    model.refresh()
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-            }
         }
         .sheet(isPresented: $showingAddService) {
             AddServiceSheet(model: model)
@@ -267,101 +265,113 @@ private struct ManageServiceDetail: View {
     @Binding var deleteConfirmation: DeleteConfirmation?
     let model: LoadoutMenuModel
 
+    private var detailSubtitle: String {
+        if let selectedVariant {
+            return "Exporting variant \(selectedVariant)"
+        }
+        return "Not included in export"
+    }
+
     var body: some View {
-        Form {
-            Section("Selection") {
-                if entry.variants.isEmpty {
-                    Text("No variants stored for this service.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Picker("Variant", selection: $draftVariant) {
+        VStack(spacing: 0) {
+            LoadoutTabHeader(title: entry.service, subtitle: detailSubtitle)
+            Divider()
+            LoadoutTabContent {
+                LoadoutGroupedForm {
+                    Section("Selection") {
+                        if entry.variants.isEmpty {
+                            Text("No variants stored for this service.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Picker("Variant", selection: $draftVariant) {
+                                ForEach(entry.variants, id: \.self) { variant in
+                                    Text(variant).tag(variant)
+                                }
+                            }
+                            .onChange(of: draftVariant) { _, newValue in
+                                guard !newValue.isEmpty, selectedVariant != nil else { return }
+                                model.select(service: entry.service, variant: newValue)
+                            }
+                        }
+
+                        Toggle(
+                            "Active in export",
+                            isOn: Binding(
+                                get: { selectedVariant != nil },
+                                set: { active in
+                                    if active {
+                                        model.select(service: entry.service, variant: draftVariant)
+                                    } else {
+                                        model.deselect(service: entry.service)
+                                    }
+                                }
+                            )
+                        )
+
+                        if draftVariant == "prod" {
+                            Label("Prod variant — double-check before exporting", systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+
+                    Section("Variants") {
                         ForEach(entry.variants, id: \.self) { variant in
-                            Text(variant).tag(variant)
-                        }
-                    }
-                    .onChange(of: draftVariant) { _, newValue in
-                        guard !newValue.isEmpty, selectedVariant != nil else { return }
-                        model.select(service: entry.service, variant: newValue)
-                    }
-                }
-
-                Toggle(
-                    "Active in export",
-                    isOn: Binding(
-                        get: { selectedVariant != nil },
-                        set: { active in
-                            if active {
-                                model.select(service: entry.service, variant: draftVariant)
-                            } else {
-                                model.deselect(service: entry.service)
+                            HStack {
+                                Text(variant)
+                                Spacer()
+                                Text("\(entry.variableCounts[variant] ?? 0) vars")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                if entry.variants.count > 1 {
+                                    Button(role: .destructive) {
+                                        deleteConfirmation = .variant(service: entry.service, variant: variant)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("Delete variant")
+                                }
                             }
                         }
-                    )
-                )
-
-                if draftVariant == "prod" {
-                    Label("Prod variant — double-check before exporting", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-            }
-
-            Section("Variants") {
-                ForEach(entry.variants, id: \.self) { variant in
-                    HStack {
-                        Text(variant)
-                        Spacer()
-                        Text("\(entry.variableCounts[variant] ?? 0) vars")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if entry.variants.count > 1 {
-                            Button(role: .destructive) {
-                                deleteConfirmation = .variant(service: entry.service, variant: variant)
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Delete variant")
-                        }
+                        Button("Add variant…", action: onAddVariant)
                     }
-                }
-                Button("Add variant…", action: onAddVariant)
-            }
 
-            Section("Variables (\(draftVariant))") {
-                let names = model.variableNames(service: entry.service, variant: draftVariant)
-                if names.isEmpty {
-                    Text("No variables stored for this variant.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(names, id: \.self) { name in
-                        VariableRow(
-                            name: name,
-                            service: entry.service,
-                            variant: draftVariant,
-                            model: model,
-                            onEdit: { onEditVariable(name) },
-                            onDelete: {
-                                deleteConfirmation = .variable(
+                    Section("Variables (\(draftVariant))") {
+                        let names = model.variableNames(service: entry.service, variant: draftVariant)
+                        if names.isEmpty {
+                            Text("No variables stored for this variant.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(names, id: \.self) { name in
+                                VariableRow(
+                                    name: name,
                                     service: entry.service,
                                     variant: draftVariant,
-                                    name: name
+                                    model: model,
+                                    onEdit: { onEditVariable(name) },
+                                    onDelete: {
+                                        deleteConfirmation = .variable(
+                                            service: entry.service,
+                                            variant: draftVariant,
+                                            name: name
+                                        )
+                                    }
                                 )
                             }
-                        )
+                        }
+                        Button("Add variable…", action: onAddVariable)
+                    }
+
+                    Section {
+                        Button("Delete service…", role: .destructive) {
+                            deleteConfirmation = .service(entry.service)
+                        }
                     }
                 }
-                Button("Add variable…", action: onAddVariable)
-            }
-
-            Section {
-                Button("Delete service…", role: .destructive) {
-                    deleteConfirmation = .service(entry.service)
-                }
+                .padding(LoadoutChrome.contentPadding)
             }
         }
-        .formStyle(.grouped)
-        .navigationTitle(entry.service)
     }
 }
 
