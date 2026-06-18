@@ -191,6 +191,7 @@ struct ManageView: View {
         }
     }
 
+    @MainActor
     private func resolvedDraftVariant(for entry: RegistryEntry) -> String {
         if let selected = model.selectedVariant(for: entry.service),
            entry.variants.contains(selected)
@@ -210,6 +211,7 @@ struct ManageView: View {
         )
     }
 
+    @MainActor
     private func activeVariant(for service: String) -> String {
         guard let entry = model.registryEntry(for: service) else {
             return model.selectedVariant(for: service) ?? "prod"
@@ -220,6 +222,7 @@ struct ManageView: View {
             : variant
     }
 
+    @MainActor
     private func performDelete(_ target: DeleteConfirmation) {
         switch target {
         case .variable(let service, let variant, let name):
@@ -486,7 +489,7 @@ private struct VariableRow: View {
         Task {
             do {
                 try await KeychainAuthenticator.authenticateForSecretAccess()
-                let value = try model.variableValue(service: service, variant: variant, name: name)
+                let value = try await model.variableValue(service: service, variant: variant, name: name)
                 revealedValue = value ?? ""
                 if value == nil {
                     loadError = "Could not read value. Unlock the loadout keychain and try again."
