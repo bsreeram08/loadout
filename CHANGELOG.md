@@ -4,6 +4,19 @@ All notable changes to Loadout are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Versions use `MAJOR.MINOR.PATCH.MICRO`.
 
+## [0.2.0.3] - 2026-06-19
+
+### Changed
+
+- **Unified window chrome** — shared header, brand mark, and segmented navigation on every tab
+- **Settings in main window** — General and Storage tabs live inside Loadout (no separate preferences window)
+
+### Fixed
+
+- Menu bar stuck on **Loading…** when keychain scan was cancelled on each menu open
+- Tab picker renders native segmented buttons instead of plain text labels
+- Consistent empty-state layout across Services, Export, About, and Settings
+
 ## [0.2.0.2] - 2026-06-19
 
 ### Added
