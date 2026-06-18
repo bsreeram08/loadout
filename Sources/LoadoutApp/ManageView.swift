@@ -150,16 +150,10 @@ struct ManageView: View {
     @ViewBuilder
     private var detailPane: some View {
         if let error = model.context?.errorMessage {
-            VStack(spacing: 12) {
-                GlassIconBadge(systemImage: "lock.slash", size: 56)
-                Text("Keychain error")
-                    .font(.headline)
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            LoadoutPlaceholderState(
+                title: "Keychain error",
+                message: error
+            )
         } else if let service = model.manageSelection,
                   let entry = model.registryEntry(for: service)
         {
@@ -188,19 +182,12 @@ struct ManageView: View {
             )
             .id(service)
         } else {
-            VStack(spacing: 12) {
-                GlassIconBadge(systemImage: "sidebar.left", size: 56)
-                Text("Select a service")
-                    .font(.headline)
-                Text("Choose a service to manage variants and variables.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Add service…") {
-                    showingAddService = true
-                }
-                .modifier(GlassButtonModifier())
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            LoadoutPlaceholderState(
+                title: "Select a service",
+                message: "Choose a service from the sidebar to manage variants and variables.",
+                actionTitle: "Add service…",
+                action: { showingAddService = true }
+            )
         }
     }
 

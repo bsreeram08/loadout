@@ -62,37 +62,6 @@ struct GlassSegmentedPicker<Option: Hashable & Identifiable>: View {
     }
 }
 
-struct GlassIconBadge: View {
-    let systemImage: String
-    var size: CGFloat = 72
-
-    var body: some View {
-        if #available(macOS 26, *) {
-            Image(systemName: systemImage)
-                .font(.system(size: size * 0.45))
-                .foregroundStyle(.secondary)
-                .frame(width: size, height: size)
-                .glassEffect(.regular, in: .circle)
-        } else {
-            Image(systemName: systemImage)
-                .font(.system(size: size * 0.45))
-                .foregroundStyle(.secondary)
-                .frame(width: size, height: size)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-    }
-}
-
-struct GlassButtonModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26, *) {
-            content.buttonStyle(.glass)
-        } else {
-            content.buttonStyle(.borderedProminent)
-        }
-    }
-}
-
 struct GlassCodePanel<Content: View>: View {
     @ViewBuilder let content: () -> Content
 

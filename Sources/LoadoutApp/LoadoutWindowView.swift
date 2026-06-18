@@ -6,14 +6,7 @@ struct LoadoutWindowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            GlassSegmentedPicker(
-                options: LoadoutWindowTab.allCases,
-                selection: $tab,
-                label: { $0.title },
-                icon: { $0.icon }
-            )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            LoadoutWindowHeader(tab: $tab)
 
             Divider()
 
@@ -60,15 +53,30 @@ struct SettingsSceneView: View {
     @Bindable var model: LoadoutMenuModel
 
     var body: some View {
-        TabView {
-            GeneralSettingsTab(model: model)
-                .tabItem {
-                    Label("General", systemImage: "gearshape")
-                }
-            PathsSettingsTab(model: model)
-                .tabItem {
-                    Label("Storage", systemImage: "externaldrive")
-                }
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                LoadoutMark(size: LoadoutChrome.headerMarkSize)
+                Text("Settings")
+                    .font(.headline)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, LoadoutChrome.contentPadding)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            Divider()
+
+            TabView {
+                GeneralSettingsTab(model: model)
+                    .tabItem {
+                        Label("General", systemImage: "gearshape")
+                    }
+                PathsSettingsTab(model: model)
+                    .tabItem {
+                        Label("Storage", systemImage: "externaldrive")
+                    }
+            }
+            .padding(.top, 4)
         }
         .frame(minWidth: 420, minHeight: 320)
     }

@@ -37,7 +37,7 @@ struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .padding()
+        .padding(LoadoutChrome.contentPadding)
     }
 }
 
@@ -71,7 +71,7 @@ struct PathsSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .padding()
+        .padding(LoadoutChrome.contentPadding)
     }
 }
 
@@ -79,47 +79,38 @@ struct ExportSettingsTab: View {
     let model: LoadoutMenuModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Active export preview")
-                .font(.headline)
+        LoadoutPanelScaffold {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Active export preview")
+                    .font(.headline)
+                Text(model.context?.summary.footerLabel ?? "")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } content: {
+            VStack(alignment: .leading, spacing: 12) {
+                GlassCodePanel {
+                    ScrollView {
+                        Text(model.exportPreview.isEmpty ? "# nothing selected" : model.exportPreview)
+                            .font(.system(.caption, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                }
 
-            Text(model.context?.summary.footerLabel ?? "")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            GlassCodePanel {
-                ScrollView {
-                    Text(model.exportPreview.isEmpty ? "# nothing selected" : model.exportPreview)
-                        .font(.system(.caption, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
+                Button("How to reload open terminals…") {
+                    model.showReloadHint()
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Button("How to reload open terminals…") {
-                model.showReloadHint()
-            }
         }
-        .padding()
     }
 }
 
 struct AboutSettingsTab: View {
     var body: some View {
-        VStack(spacing: 12) {
-            GlassIconBadge(systemImage: "slider.horizontal.3")
-            Text(LoadoutAppInfo.name)
-                .font(.title2)
-            Text("Version \(LoadoutAppInfo.version)")
-                .foregroundStyle(.secondary)
-            Text("Per-service environment profiles for macOS terminals.")
-                .font(.caption)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        LoadoutPlaceholderState(
+            title: LoadoutAppInfo.name,
+            message: "Version \(LoadoutAppInfo.version)\n\nPer-service environment profiles for macOS terminals."
+        )
     }
 }
