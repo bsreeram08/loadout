@@ -18,7 +18,8 @@ if [[ ! -f "${ROOT}/Assets/AppIcon.icns" ]]; then
 fi
 
 echo "building loadout + LoadoutApp (${BUILD_CONFIG})..."
-(cd "$ROOT" && swift build -c "${BUILD_CONFIG}" --product loadout --product LoadoutApp)
+(cd "$ROOT" && swift build -c "${BUILD_CONFIG}" --product loadout)
+(cd "$ROOT" && swift build -c "${BUILD_CONFIG}" --product LoadoutApp)
 
 LOADOUT_APP_BIN="$(resolve_swift_binary LoadoutApp "$ROOT" "$BUILD_CONFIG")"
 LOADOUT_CLI_BIN="$(resolve_swift_binary loadout "$ROOT" "$BUILD_CONFIG")"
