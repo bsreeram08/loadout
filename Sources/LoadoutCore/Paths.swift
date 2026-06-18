@@ -12,7 +12,12 @@ public enum LoadoutPaths {
     }
 
     public static var stateFileURL: URL {
-        configDirectory.appendingPathComponent(stateFileName)
+        if let override = ProcessInfo.processInfo.environment["LOADOUT_STATE_PATH"],
+           !override.isEmpty
+        {
+            return URL(fileURLWithPath: override)
+        }
+        return configDirectory.appendingPathComponent(stateFileName)
     }
 
     public static func keychainService(service: String, variant: String) -> String {

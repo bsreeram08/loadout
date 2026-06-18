@@ -6,7 +6,12 @@ public enum LoadoutKeychain {
     public static let fileName = "loadout.keychain-db"
 
     public static var path: String {
-        FileManager.default.homeDirectoryForCurrentUser
+        if let override = ProcessInfo.processInfo.environment["LOADOUT_KEYCHAIN_PATH"],
+           !override.isEmpty
+        {
+            return override
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Keychains/\(fileName)")
             .path
     }
@@ -89,31 +94,36 @@ public enum LoadoutKeychain {
             path,
         ], allowFailure: true)
 
-        let input = Pipe()
+        let stderr = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        // Pass -w explicitly. Stdin after run() races: security reads empty password.
         process.arguments = [
             "add-generic-password",
             "-a", account,
             "-s", service,
+            "-w", value,
             "-A",
             path,
         ]
-        process.standardInput = input
         process.standardOutput = FileHandle.nullDevice
-        process.standardError = Pipe()
+        process.standardError = stderr
         try process.run()
-        input.fileHandleForWriting.write(Data(value.utf8))
-        try input.fileHandleForWriting.close()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            let err = (process.standardError as? Pipe)?
-                .fileHandleForReading.readDataToEndOfFile()
-            let detail = err.flatMap { String(data: $0, encoding: .utf8) }?
+            let detail = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             throw LoadoutError.io(
                 "failed to store \(service)/\(account) (exit \(process.terminationStatus)"
                     + (detail.isEmpty ? ")" : ": \(detail))")
+            )
+        }
+
+        guard let readBack = try readSecret(keychain: path, service: service, account: account),
+              readBack == value
+        else {
+            throw LoadoutError.io(
+                "read-back verification failed for \(service)/\(account) — stored data mismatch"
             )
         }
     }
