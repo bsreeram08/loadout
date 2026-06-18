@@ -31,7 +31,17 @@ struct LoadoutMenuView: View {
                     .foregroundStyle(.secondary)
                     .help(error)
                 Divider()
-            } else if model.context?.registry.isEmpty ?? true {
+            } else if model.context == nil {
+                if model.isRefreshing {
+                    Text("Loading services…")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button("Retry loading…") {
+                        model.refresh(force: true)
+                    }
+                }
+                Divider()
+            } else if model.context?.registry.isEmpty == true {
                 Button("Import secrets…") {
                     model.showImportHint()
                 }
@@ -47,8 +57,13 @@ struct LoadoutMenuView: View {
                     .font(.caption)
             }
 
-            Text(statusLine)
-                .foregroundStyle(.secondary)
+            if model.context == nil, model.isRefreshing {
+                Text("Loading…")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(statusLine)
+                    .foregroundStyle(.secondary)
+            }
 
             Button("Reload open terminals…") {
                 model.showReloadHint()
@@ -62,7 +77,7 @@ struct LoadoutMenuView: View {
             .keyboardShortcut("q")
         }
         .onAppear {
-            model.refresh()
+            model.refreshIfStale()
         }
     }
 
@@ -92,7 +107,7 @@ struct LoadoutMenuView: View {
     }
 
     private var statusLine: String {
-        guard let context = model.context else { return "Loading…" }
+        guard let context = model.context else { return "Couldn't load state" }
         let stored = context.registry.count
         let summary = context.summary
         if summary.selectedServiceCount == 0 {

@@ -34,7 +34,7 @@ final class LoadoutMenuModel {
     private let exportEngine = ExportEngine()
     private var catalog: KeychainCatalog?
     private var variableNamesByKey: [String: [String]] = [:]
-    private var refreshTask: Task<Void, Never>?
+    private var refreshGeneration: UInt = 0
     @ObservationIgnored nonisolated(unsafe) private var refreshObserver: NSObjectProtocol?
 
     init() {
@@ -44,9 +44,10 @@ final class LoadoutMenuModel {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.refresh()
+                self?.refresh(force: true)
             }
         }
+        refresh()
     }
 
     deinit {
@@ -63,12 +64,26 @@ final class LoadoutMenuModel {
     var keychainPath: String { LoadoutKeychain.path }
     var cliPath: String { CLIInstaller.installURL.path }
 
-    func refresh(includeExportPreview: Bool = false) {
-        refreshTask?.cancel()
-        isRefreshing = context == nil
-        refreshTask = Task { [weak self] in
-            await self?.performRefresh(includeExportPreview: includeExportPreview)
+    func refresh(includeExportPreview: Bool = false, force: Bool = false) {
+        if isRefreshing, !force, !includeExportPreview {
+            return
         }
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
+        if context == nil {
+            isRefreshing = true
+        }
+        Task { @MainActor [weak self] in
+            await self?.performRefresh(
+                includeExportPreview: includeExportPreview,
+                generation: generation
+            )
+        }
+    }
+
+    func refreshIfStale() {
+        guard context == nil else { return }
+        refresh(force: true)
     }
 
     func registryEntry(for service: String) -> RegistryEntry? {
@@ -223,19 +238,25 @@ final class LoadoutMenuModel {
         )
     }
 
-    private func performRefresh(includeExportPreview: Bool) async {
+    private func performRefresh(includeExportPreview: Bool, generation: UInt) async {
+        defer {
+            if generation == refreshGeneration {
+                isRefreshing = false
+            }
+        }
+
         do {
             let loadedCatalog = try await Task.detached(priority: .userInitiated) {
                 try KeychainCatalog()
             }.value
-            guard !Task.isCancelled else { return }
+            guard generation == refreshGeneration else { return }
 
             let state = try stateStore.load()
             let registry = loadedCatalog.registry()
             let summary = SelectionSummary.compute(state: state, registry: registry)
             let namesIndex = Self.variableNamesIndex(registry: registry, catalog: loadedCatalog)
             let order = orderedServices(state: state, registry: registry)
-            guard !Task.isCancelled else { return }
+            guard generation == refreshGeneration else { return }
             catalog = loadedCatalog
             variableNamesByKey = namesIndex
             context = MenuContext(
@@ -253,7 +274,7 @@ final class LoadoutMenuModel {
                 )
             }
         } catch {
-            guard !Task.isCancelled else { return }
+            guard generation == refreshGeneration else { return }
             catalog = nil
             variableNamesByKey = [:]
             context = MenuContext(
@@ -270,8 +291,8 @@ final class LoadoutMenuModel {
             exportPreview = ""
             sanitizeManageSelection(registry: [])
         }
+        guard generation == refreshGeneration else { return }
         loginEnabled = LoginItemController.isEnabled
-        isRefreshing = false
     }
 
     private func apply(
