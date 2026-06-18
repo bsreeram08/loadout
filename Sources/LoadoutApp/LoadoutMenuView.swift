@@ -42,8 +42,11 @@ struct LoadoutMenuView: View {
                 }
                 Divider()
             } else if model.context?.registry.isEmpty == true {
-                Button("Import secrets…") {
-                    model.showImportHint()
+                Text("No services stored yet")
+                    .foregroundStyle(.secondary)
+                Button("Add service…") {
+                    model.preferredWindowTab = .services
+                    openMainWindow()
                 }
                 Divider()
             } else {
@@ -63,10 +66,6 @@ struct LoadoutMenuView: View {
             } else {
                 Text(statusLine)
                     .foregroundStyle(.secondary)
-            }
-
-            Button("Reload open terminals…") {
-                model.showReloadHint()
             }
 
             Divider()
