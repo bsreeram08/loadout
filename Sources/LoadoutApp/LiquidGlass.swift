@@ -50,53 +50,7 @@ struct GlassSegmentedPicker<Option: Hashable & Identifiable>: View {
     let label: (Option) -> String
     let icon: (Option) -> String
 
-    @Namespace private var animation
-
     var body: some View {
-        if #available(macOS 26, *) {
-            glassPicker
-        } else {
-            fallbackPicker
-        }
-    }
-
-    @available(macOS 26, *)
-    private var glassPicker: some View {
-        GlassEffectContainer(spacing: 4) {
-            HStack(spacing: 4) {
-                ForEach(options) { option in
-                    glassSegment(option)
-                }
-            }
-            .padding(4)
-        }
-    }
-
-    @available(macOS 26, *)
-    private func glassSegment(_ option: Option) -> some View {
-        let isSelected = selection.id == option.id
-        return Button {
-            withAnimation(.smooth) {
-                selection = option
-            }
-        } label: {
-            Label(label(option), systemImage: icon(option))
-                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-        }
-        .buttonStyle(.plain)
-        .glassEffect(
-            isSelected
-                ? .regular.tint(.accentColor.opacity(0.2)).interactive()
-                : .regular.interactive(),
-            in: .capsule
-        )
-        .glassEffectID(isSelected ? "selected" : "option-\(option.id)", in: animation)
-    }
-
-    private var fallbackPicker: some View {
         Picker("Section", selection: $selection) {
             ForEach(options) { option in
                 Label(label(option), systemImage: icon(option))
