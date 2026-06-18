@@ -11,13 +11,13 @@ permissions:
 jobs:
   build:
     strategy:
-      fail-fast: false
       matrix:
         include:
           - runner: macos-latest
             arch: arm64
-          - runner: macos-13
-            arch: x86_64
+          # Re-enable when macos-13 runner capacity is reliable:
+          # - runner: macos-13
+          #   arch: x86_64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
