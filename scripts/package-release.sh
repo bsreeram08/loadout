@@ -16,15 +16,7 @@ echo "packaging loadout ${VERSION} (${ARCH}, ${BUILD_CONFIG})..."
 "${ROOT}/scripts/build-app.sh"
 
 APP="${ROOT}/dist/Loadout.app"
-BIN_DIR="${ROOT}/.build/${ARCH}-apple-macosx/${BUILD_CONFIG}"
-CLI="${BIN_DIR}/loadout"
-if [[ ! -f "$CLI" ]]; then
-  CLI="${ROOT}/.build/${BUILD_CONFIG}/loadout"
-fi
-if [[ ! -f "$CLI" ]]; then
-  echo "error: loadout binary not found after build" >&2
-  exit 1
-fi
+CLI="$(resolve_swift_binary loadout "$ROOT" "$BUILD_CONFIG")"
 
 rm -rf "$RELEASE_DIR" "$STAGING"
 mkdir -p "$RELEASE_DIR" "$STAGING"

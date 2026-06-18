@@ -44,3 +44,35 @@ signing_label() {
     echo "$identity"
   fi
 }
+
+# Resolve a Swift PM executable across arch-specific .build layouts.
+resolve_swift_binary() {
+  local product="$1"
+  local root="$2"
+  local config="${3:-release}"
+
+  local arch
+  arch="$(uname -m)"
+  local -a candidates=(
+    "${root}/.build/${arch}-apple-macosx/${config}/${product}"
+    "${root}/.build/${config}/${product}"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  while IFS= read -r candidate; do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done < <(find "${root}/.build" -path "*/${config}/${product}" -type f 2>/dev/null | sort)
+
+  echo "error: ${product} binary not found after build (config=${config})" >&2
+  return 1
+}

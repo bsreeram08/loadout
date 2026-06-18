@@ -20,17 +20,15 @@ fi
 echo "building loadout + LoadoutApp (${BUILD_CONFIG})..."
 (cd "$ROOT" && swift build -c "${BUILD_CONFIG}" --product loadout --product LoadoutApp)
 
-BIN_DIR="${ROOT}/.build/$(uname -m | sed 's/arm64/arm64/')-apple-macosx/${BUILD_CONFIG}"
-if [[ ! -f "${BIN_DIR}/LoadoutApp" ]]; then
-  BIN_DIR="${ROOT}/.build/${BUILD_CONFIG}"
-fi
+LOADOUT_APP_BIN="$(resolve_swift_binary LoadoutApp "$ROOT" "$BUILD_CONFIG")"
+LOADOUT_CLI_BIN="$(resolve_swift_binary loadout "$ROOT" "$BUILD_CONFIG")"
 
 rm -rf "$APP"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 
-cp "${BIN_DIR}/LoadoutApp" "${APP}/Contents/MacOS/LoadoutApp"
-cp "${BIN_DIR}/loadout" "${APP}/Contents/MacOS/loadout"
-cp "${BIN_DIR}/loadout" "${APP}/Contents/Resources/loadout"
+cp "${LOADOUT_APP_BIN}" "${APP}/Contents/MacOS/LoadoutApp"
+cp "${LOADOUT_CLI_BIN}" "${APP}/Contents/MacOS/loadout"
+cp "${LOADOUT_CLI_BIN}" "${APP}/Contents/Resources/loadout"
 cp "${ROOT}/Assets/AppIcon.icns" "${APP}/Contents/Resources/AppIcon.icns"
 cp "${ROOT}/Sources/LoadoutApp/Resources/MenuBarIcon.png" "${APP}/Contents/Resources/"
 cp "${ROOT}/Sources/LoadoutApp/Resources/MenuBarIcon@2x.png" "${APP}/Contents/Resources/"

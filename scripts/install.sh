@@ -12,15 +12,7 @@ TARGET="${INSTALL_DIR}/loadout"
 echo "building loadout (${BUILD_CONFIG})..."
 (cd "$ROOT" && swift build -c "${BUILD_CONFIG}" --product loadout)
 
-BIN_DIR="${ROOT}/.build/$(uname -m | sed 's/arm64/arm64/')-apple-macosx/${BUILD_CONFIG}"
-BINARY="${BIN_DIR}/loadout"
-if [[ ! -f "$BINARY" ]]; then
-  BINARY="${ROOT}/.build/${BUILD_CONFIG}/loadout"
-fi
-if [[ ! -f "$BINARY" ]]; then
-  echo "error: loadout binary not found after build" >&2
-  exit 1
-fi
+BINARY="$(resolve_swift_binary loadout "$ROOT" "$BUILD_CONFIG")"
 
 mkdir -p "$INSTALL_DIR"
 cp -f "$BINARY" "$TARGET"
