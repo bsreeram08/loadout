@@ -199,15 +199,13 @@ public struct KeychainStore: Sendable {
     }
 
     private func allLoadoutItems(includeData: Bool) throws -> [LoadoutItem] {
-        var query: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecReturnAttributes as String: true,
+            kSecReturnData as String: includeData,
             kSecMatchLimit as String: kSecMatchLimitAll,
             kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
         ]
-        if includeData {
-            query[kSecReturnData as String] = true
-        }
 
         var items: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &items)

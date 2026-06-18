@@ -33,9 +33,11 @@ enum KeychainAccess {
             process.standardOutput = FileHandle.nullDevice
 
             try process.run()
+            let text = String(
+                data: output.fileHandleForReading.readDataToEndOfFile(),
+                encoding: .utf8
+            ) ?? ""
             process.waitUntilExit()
-
-            let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
             if let cdhash = parseCDHash(from: text) {
                 return cdhash
             }

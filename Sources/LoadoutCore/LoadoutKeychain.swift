@@ -92,20 +92,20 @@ public enum LoadoutKeychain {
         }
     }
 
-    static func dumpKeychain(_ keychainPath: String) throws -> String {
+    /// Dumps keychain metadata only (no `-d` flag — avoids per-item secret-access prompts).
+    static func dumpKeychainAttributes(_ keychainPath: String) throws -> String {
         try withBlocking {
             let output = Pipe()
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-            process.arguments = ["dump-keychain", "-d", keychainPath]
+            process.arguments = ["dump-keychain", keychainPath]
             process.standardOutput = output
             process.standardError = FileHandle.nullDevice
-            try process.run()
-            process.waitUntilExit()
+            let data = try runProcess(process)
             guard process.terminationStatus == 0 else {
                 return ""
             }
-            return String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            return String(data: data, encoding: .utf8) ?? ""
         }
     }
 
@@ -116,12 +116,11 @@ public enum LoadoutKeychain {
         process.arguments = ["list-keychains", "-d", "user"]
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
+        let data = try runProcess(process)
         guard process.terminationStatus == 0 else {
             throw LoadoutError.io("failed to read keychain search list")
         }
-        let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let text = String(data: data, encoding: .utf8) ?? ""
         return text
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "\" ")) }
@@ -159,10 +158,9 @@ public enum LoadoutKeychain {
             ]
             process.standardOutput = FileHandle.nullDevice
             process.standardError = stderr
-            try process.run()
-            process.waitUntilExit()
+            let stderrData = try runProcess(process, stderr: stderr)
             guard process.terminationStatus == 0 else {
-                let detail = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                let detail = String(data: stderrData, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 throw LoadoutError.io(
                     "failed to store \(service)/\(account) (exit \(process.terminationStatus)"
@@ -203,14 +201,25 @@ public enum LoadoutKeychain {
         ]
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
+        let data = try runProcess(process)
         if process.terminationStatus != 0 {
             return nil
         }
-        let data = output.fileHandleForReading.readDataToEndOfFile()
         guard let value = String(data: data, encoding: .utf8) else { return nil }
         return value.trimmingCharacters(in: .newlines)
+    }
+
+    @discardableResult
+    private static func runProcess(_ process: Process, stderr: Pipe? = nil) throws -> Data {
+        let stdout = process.standardOutput as? Pipe
+        try process.run()
+        let outData = stdout?.fileHandleForReading.readDataToEndOfFile() ?? Data()
+        let errData = stderr?.fileHandleForReading.readDataToEndOfFile() ?? Data()
+        process.waitUntilExit()
+        if stderr != nil {
+            return errData
+        }
+        return outData
     }
 
     static func deleteFromLogin(service: String, account: String) throws {
