@@ -272,6 +272,10 @@ private struct ManageServiceDetail: View {
         return "Not included in export"
     }
 
+    private var variableNames: [String] {
+        model.variableNames(service: entry.service, variant: draftVariant)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             LoadoutTabHeader(title: entry.service, subtitle: detailSubtitle)
@@ -289,8 +293,10 @@ private struct ManageServiceDetail: View {
                                 }
                             }
                             .onChange(of: draftVariant) { _, newValue in
-                                guard !newValue.isEmpty, selectedVariant != nil else { return }
-                                model.select(service: entry.service, variant: newValue)
+                                Task { @MainActor in
+                                    guard !newValue.isEmpty, selectedVariant != nil else { return }
+                                    model.select(service: entry.service, variant: newValue)
+                                }
                             }
                         }
 
@@ -338,12 +344,11 @@ private struct ManageServiceDetail: View {
                     }
 
                     Section("Variables (\(draftVariant))") {
-                        let names = model.variableNames(service: entry.service, variant: draftVariant)
-                        if names.isEmpty {
+                        if variableNames.isEmpty {
                             Text("No variables stored for this variant.")
                                 .foregroundStyle(.secondary)
                         } else {
-                            ForEach(names, id: \.self) { name in
+                            ForEach(variableNames, id: \.self) { name in
                                 VariableRow(
                                     name: name,
                                     service: entry.service,

@@ -300,6 +300,10 @@ public enum LoadoutKeychain {
         }
     }
 
+    static func performBlocking<T>(_ body: () throws -> T) rethrows -> T {
+        try withBlocking(body)
+    }
+
     private static func withBlocking<T>(_ body: () throws -> T) rethrows -> T {
         if DispatchQueue.getSpecific(key: blockingQueueKey) != nil {
             return try body()
