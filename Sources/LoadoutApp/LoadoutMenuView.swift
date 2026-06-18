@@ -2,6 +2,7 @@ import AppKit
 import LoadoutCore
 import SwiftUI
 
+@MainActor
 struct LoadoutMenuView: View {
     @Bindable var model: LoadoutMenuModel
     @Environment(\.openWindow) private var openWindow

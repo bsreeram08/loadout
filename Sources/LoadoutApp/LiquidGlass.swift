@@ -9,6 +9,31 @@ enum LiquidGlass {
     }
 }
 
+@available(macOS 26, *)
+private struct GlassSurfaceModifier: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content.glassEffect(in: .rect(cornerRadius: cornerRadius))
+    }
+}
+
+@available(macOS 26, *)
+private struct GlassSurfaceProminentModifier: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content.glassEffect(.regular.tint(.accentColor.opacity(0.15)), in: .rect(cornerRadius: cornerRadius))
+    }
+}
+
+@available(macOS 26, *)
+private struct GlassInteractiveCapsuleModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.glassEffect(.regular.interactive(), in: .capsule)
+    }
+}
+
 extension View {
     @ViewBuilder
     func glassSurface(
@@ -16,7 +41,7 @@ extension View {
         material: Material = .ultraThinMaterial
     ) -> some View {
         if #available(macOS 26, *) {
-            glassEffect(in: .rect(cornerRadius: cornerRadius))
+            modifier(GlassSurfaceModifier(cornerRadius: cornerRadius))
         } else {
             background(material, in: RoundedRectangle(cornerRadius: cornerRadius))
         }
@@ -28,7 +53,7 @@ extension View {
         material: Material = .thinMaterial
     ) -> some View {
         if #available(macOS 26, *) {
-            glassEffect(.regular.tint(.accentColor.opacity(0.15)), in: .rect(cornerRadius: cornerRadius))
+            modifier(GlassSurfaceProminentModifier(cornerRadius: cornerRadius))
         } else {
             background(material, in: RoundedRectangle(cornerRadius: cornerRadius))
         }
@@ -37,7 +62,7 @@ extension View {
     @ViewBuilder
     func glassInteractiveCapsule() -> some View {
         if #available(macOS 26, *) {
-            glassEffect(.regular.interactive(), in: .capsule)
+            modifier(GlassInteractiveCapsuleModifier())
         } else {
             background(.ultraThinMaterial, in: Capsule())
         }
