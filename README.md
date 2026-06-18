@@ -2,7 +2,7 @@
 
 Local-first macOS tool for **per-service environment profiles**. Toggle each service's variant independently (e.g. Worldline → prod, Bambora → test), keep secrets encrypted in the macOS Keychain, and load the active set into new terminal sessions.
 
-**Current version:** `0.2.0.2`
+**Current version:** `0.2.0.3`
 
 ```
 Menu bar (compact)          Main window (full catalog)
@@ -40,7 +40,22 @@ If your `~/.zshrc` is a wall of commented/uncommented `export` blocks across dev
 
 ## Install
 
-### CLI
+### GitHub Releases (recommended)
+
+Download from [Releases](https://github.com/bsreeram08/loadout/releases) — each tag ships **both** artifacts:
+
+| Asset | Install |
+|-------|---------|
+| `loadout-*-macos-arm64.tar.gz` (or `x86_64`) | Extract, copy `bin/loadout` to `~/.local/bin/` |
+| `Loadout-*-macos-*.zip` | Unzip, drag `Loadout.app` to `/Applications/` |
+
+The menu bar app bundles the CLI and installs it to `~/.local/bin` on first launch if missing or older.
+
+When release signing secrets are configured in CI, binaries are **Developer ID signed and notarized** (Gatekeeper-verified). Otherwise builds are ad-hoc signed for local use.
+
+### Build from source
+
+**CLI:**
 
 ```bash
 git clone https://github.com/bsreeram08/loadout.git
@@ -50,7 +65,7 @@ cd loadout
 
 Adds `loadout` to `~/.local/bin` (release build by default). Ensure that directory is on your `PATH`.
 
-### Menu bar app
+**Menu bar app:**
 
 ```bash
 ./scripts/build-app.sh
@@ -58,7 +73,12 @@ cp -R dist/Loadout.app /Applications/
 open /Applications/Loadout.app
 ```
 
-The app bundles the CLI and installs it to `~/.local/bin` on first launch if missing or older.
+**Release packages (maintainers):**
+
+```bash
+./scripts/package-release.sh                              # ad-hoc
+SIGN_IDENTITY="Developer ID Application: …" NOTARIZE=1 ./scripts/package-release.sh
+```
 
 ### Shell hook
 

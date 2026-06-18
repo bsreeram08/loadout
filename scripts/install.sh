@@ -2,6 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=scripts/lib/sign.sh
+source "${ROOT}/scripts/lib/sign.sh"
+
 INSTALL_DIR="${HOME}/.local/bin"
 BUILD_CONFIG="${BUILD_CONFIG:-release}"
 TARGET="${INSTALL_DIR}/loadout"
@@ -22,11 +25,11 @@ fi
 mkdir -p "$INSTALL_DIR"
 cp -f "$BINARY" "$TARGET"
 
-if command -v codesign >/dev/null 2>&1; then
-  codesign -s - --force --timestamp=none "$TARGET"
-  echo "signed (ad-hoc) → ${TARGET}"
+if is_signed "$TARGET"; then
+  echo "already signed → ${TARGET}"
 else
-  echo "warning: codesign not found — keychain may keep prompting"
+  sign_binary "$TARGET"
+  echo "signed ($(signing_label)) → ${TARGET}"
 fi
 
 echo "installed → ${TARGET}"

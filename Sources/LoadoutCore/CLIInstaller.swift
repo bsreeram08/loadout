@@ -50,7 +50,7 @@ public struct CLIInstaller: Sendable {
             try fileManager.removeItem(at: destination)
         }
         try fileManager.copyItem(at: source, to: destination)
-        try Self.adHocSign(destination)
+        try Self.signInstalledCLIIfNeeded(destination)
         return true
     }
 
@@ -63,6 +63,28 @@ public struct CLIInstaller: Sendable {
             return true
         }
         return sourceDate > destinationDate
+    }
+
+    private static func signInstalledCLIIfNeeded(_ binary: URL) throws {
+        if isValidlySigned(binary) {
+            return
+        }
+        try adHocSign(binary)
+    }
+
+    private static func isValidlySigned(_ binary: URL) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        process.arguments = ["--verify", "--strict", binary.path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
     }
 
     private static func adHocSign(_ binary: URL) throws {

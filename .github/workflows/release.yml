@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-13
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import code signing certificate
+        if: env.APPLE_CERTIFICATE_BASE64 != ''
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/codesign.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Resolve signing identity
+        id: sign
+        env:
+          SIGN_IDENTITY_SECRET: ${{ secrets.SIGN_IDENTITY }}
+        run: |
+          if [[ -n "${SIGN_IDENTITY_SECRET:-}" ]]; then
+            echo "identity=${SIGN_IDENTITY_SECRET}" >> "$GITHUB_OUTPUT"
+            echo "mode=developer-id" >> "$GITHUB_OUTPUT"
+          else
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            echo "mode=ad-hoc" >> "$GITHUB_OUTPUT"
+            echo "::warning::SIGN_IDENTITY secret not set — release binaries will be ad-hoc signed (Gatekeeper will warn)."
+          fi
+
+      - name: Run tests
+        run: |
+          swift build --product loadout
+          LOADOUT_TEST_BINARY=$PWD/.build/debug/loadout swift test
+
+      - name: Package release
+        env:
+          SIGN_IDENTITY: ${{ steps.sign.outputs.identity }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.sign.outputs.mode }}" == "developer-id" ]]; then
+            if [[ -n "${NOTARY_KEY_ID:-}" && -n "${APPLE_ISSUER_ID:-}" && -n "${{ secrets.NOTARY_KEY_BASE64 }}" ]]; then
+              echo "${{ secrets.NOTARY_KEY_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+              export NOTARY_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+              export NOTARIZE=1
+            elif [[ -n "${APPLE_ID:-}" && -n "${NOTARY_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
+              export NOTARIZE=1
+            fi
+          fi
+          chmod +x scripts/*.sh scripts/lib/*.sh
+          ./scripts/package-release.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: loadout-${{ matrix.arch }}
+          path: dist/release/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HAS_SIGN_IDENTITY: ${{ secrets.SIGN_IDENTITY != '' }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          NOTES_FILE="$RUNNER_TEMP/notes.md"
+          if awk -v ver="$VERSION" '
+            /^\#\# \[/ {
+              if (found) exit
+              if ($0 ~ "\\[" ver "\\]") found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md > "$NOTES_FILE" && [[ -s "$NOTES_FILE" ]]; then
+            :
+          else
+            echo "Loadout ${VERSION}" > "$NOTES_FILE"
+          fi
+          if [[ "$HAS_SIGN_IDENTITY" != "true" ]]; then
+            cat >> "$NOTES_FILE" <<'WARN'
+
+          ### Code signing
+
+          These binaries are **ad-hoc signed**. macOS Gatekeeper will warn on first open.
+
+          For Developer ID + notarized releases, add GitHub Actions secrets:
+          `APPLE_CERTIFICATE_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`,
+          `SIGN_IDENTITY` (Developer ID Application), `APPLE_ID`, `APPLE_TEAM_ID`,
+          and `NOTARY_PASSWORD` (or `NOTARY_KEY_BASE64`, `NOTARY_KEY_ID`, `APPLE_ISSUER_ID`).
+
+          ### Assets
+
+          | File | Contents |
+          |------|----------|
+          | `loadout-*-macos-*.tar.gz` | CLI binary + install notes |
+          | `Loadout-*-macos-*.zip` | Menu bar app (bundles CLI) |
+          WARN
+          fi
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/* --clobber --repo "${{ github.repository }}"
+          else
+            gh release create "$TAG" artifacts/* \
+              --title "Loadout ${VERSION}" \
+              --notes-file "$NOTES_FILE" \
+              --repo "${{ github.repository }}"
+          fi
