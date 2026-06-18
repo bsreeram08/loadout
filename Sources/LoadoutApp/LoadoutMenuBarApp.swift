@@ -20,23 +20,30 @@ struct LoadoutMenuBarApp: App {
         .defaultSize(width: 720, height: 520)
         .windowToolbarStyle(.unified)
         .commands {
-            LoadoutCommands()
-        }
-
-        Settings {
-            SettingsSceneView(model: model)
+            LoadoutCommands(model: model)
         }
     }
 }
 
 private struct LoadoutCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    var model: LoadoutMenuModel
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {}
 
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings…") {
+                model.preferredWindowTab = .settings
+                openWindow(id: "loadout")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            .keyboardShortcut(",", modifiers: .command)
+        }
+
         CommandGroup(after: .appInfo) {
             Button("Open Loadout…") {
+                model.preferredWindowTab = .services
                 openWindow(id: "loadout")
                 NSApp.activate(ignoringOtherApps: true)
             }

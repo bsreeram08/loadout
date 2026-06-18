@@ -1,5 +1,35 @@
 import SwiftUI
 
+struct SettingsTabView: View {
+    @Bindable var model: LoadoutMenuModel
+    @State private var section: SettingsSection = .general
+
+    var body: some View {
+        VStack(spacing: 0) {
+            GlassSegmentedPicker(
+                options: SettingsSection.allCases,
+                selection: $section,
+                label: \.title,
+                icon: \.icon
+            )
+            .padding(.horizontal, LoadoutChrome.contentPadding)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            Group {
+                switch section {
+                case .general:
+                    GeneralSettingsTab(model: model)
+                case .storage:
+                    PathsSettingsTab(model: model)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
 struct GeneralSettingsTab: View {
     @Bindable var model: LoadoutMenuModel
 

@@ -16,6 +16,8 @@ struct LoadoutWindowView: View {
                     ManageView(model: model)
                 case .export:
                     ExportSettingsTab(model: model)
+                case .settings:
+                    SettingsTabView(model: model)
                 case .about:
                     AboutSettingsTab()
                 }
@@ -23,14 +25,6 @@ struct LoadoutWindowView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 640, minHeight: 480)
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                SettingsLink {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Open preferences (⌘,)")
-            }
-        }
         .onAppear {
             tab = model.preferredWindowTab
             refreshForTab(tab)
@@ -46,38 +40,5 @@ struct LoadoutWindowView: View {
 
     private func refreshForTab(_ tab: LoadoutWindowTab) {
         model.refresh(includeExportPreview: tab == .export)
-    }
-}
-
-struct SettingsSceneView: View {
-    @Bindable var model: LoadoutMenuModel
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                LoadoutMark(size: LoadoutChrome.headerMarkSize)
-                Text("Settings")
-                    .font(.headline)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, LoadoutChrome.contentPadding)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
-
-            Divider()
-
-            TabView {
-                GeneralSettingsTab(model: model)
-                    .tabItem {
-                        Label("General", systemImage: "gearshape")
-                    }
-                PathsSettingsTab(model: model)
-                    .tabItem {
-                        Label("Storage", systemImage: "externaldrive")
-                    }
-            }
-            .padding(.top, 4)
-        }
-        .frame(minWidth: 420, minHeight: 320)
     }
 }

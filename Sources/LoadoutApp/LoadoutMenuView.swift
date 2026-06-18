@@ -5,7 +5,6 @@ import SwiftUI
 struct LoadoutMenuView: View {
     @Bindable var model: LoadoutMenuModel
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Group {
@@ -20,8 +19,8 @@ struct LoadoutMenuView: View {
             }
 
             Button("Settings…") {
-                openSettings()
-                NSApp.activate(ignoringOtherApps: true)
+                model.preferredWindowTab = .settings
+                openMainWindow()
             }
 
             Divider()
