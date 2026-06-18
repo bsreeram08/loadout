@@ -29,6 +29,7 @@ struct LoadoutAlert: Identifiable, Equatable {
 final class LoadoutMenuModel {
     private(set) var context: MenuContext?
     private(set) var loginEnabled = LoginItemController.isEnabled
+    private(set) var shellHookInstalled = ShellHookInstaller().isInstalled()
     var manageSelection: String?
     private(set) var exportPreview = ""
     private(set) var collisionOrder: [String] = []
@@ -71,6 +72,8 @@ final class LoadoutMenuModel {
     var stateFilePath: String { LoadoutPaths.stateFileURL.path }
     var keychainPath: String { LoadoutKeychain.path }
     var cliPath: String { CLIInstaller.installURL.path }
+    var shellHookPath: String { ShellHookInstaller.zshrcURL.path }
+    var restartLoadingReady: Bool { loginEnabled && shellHookInstalled }
 
     func refresh(includeExportPreview: Bool = false, force: Bool = false) {
         if isRefreshing, !force, !includeExportPreview {
@@ -223,40 +226,45 @@ final class LoadoutMenuModel {
         }
     }
 
+    func setUpRestartLoading() {
+        Task { @MainActor in
+            do {
+                _ = try CLIInstaller().installBundledCLIIfNeeded()
+                _ = try ShellHookInstaller().installOrUpdate()
+                shellHookInstalled = ShellHookInstaller().isInstalled()
+                try LoginItemController.setEnabled(true)
+                loginEnabled = LoginItemController.isEnabled
+                presentAlert(
+                    title: "Restart loading is ready",
+                    message: "Loadout will open at login. New terminal windows will apply the current Active set automatically from your shell hook."
+                )
+            } catch {
+                shellHookInstalled = ShellHookInstaller().isInstalled()
+                loginEnabled = LoginItemController.isEnabled
+                presentAlert(
+                    title: "Restart loading setup failed",
+                    message: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    func installShellHook() {
+        Task { @MainActor in
+            do {
+                _ = try CLIInstaller().installBundledCLIIfNeeded()
+                _ = try ShellHookInstaller().installOrUpdate()
+                shellHookInstalled = ShellHookInstaller().isInstalled()
+            } catch {
+                presentAlert(title: "Shell hook", message: error.localizedDescription)
+            }
+        }
+    }
+
     func openConfigFolder() {
         NSWorkspace.shared.selectFile(
             stateFilePath,
             inFileViewerRootedAtPath: LoadoutPaths.configDirectory.path
-        )
-    }
-
-    func showReloadHint() {
-        presentAlert(
-            title: "Reload open terminals",
-            message: """
-            Loadout cannot update already-open terminals automatically.
-
-            In each open terminal, run:
-
-                reloadenv
-
-            New terminals load the active set from your .zshrc hook.
-            """
-        )
-    }
-
-    func showImportHint() {
-        let zshrc = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".zshrc").path
-        presentAlert(
-            title: "Import secrets",
-            message: """
-            Import from your shell config:
-
-                loadout import --from \(zshrc)
-
-            Or add variables from Manage → Add variable.
-            """
         )
     }
 
@@ -316,6 +324,7 @@ final class LoadoutMenuModel {
         }
         guard generation == refreshGeneration else { return }
         loginEnabled = LoginItemController.isEnabled
+        shellHookInstalled = ShellHookInstaller().isInstalled()
     }
 
     private func mutate(
