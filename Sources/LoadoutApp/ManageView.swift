@@ -54,6 +54,7 @@ private struct ServiceContext: Identifiable, Equatable {
     var id: String { service }
 }
 
+@MainActor
 struct ManageView: View {
     @Bindable var model: LoadoutMenuModel
     @State private var draftVariant = ""
@@ -205,8 +206,8 @@ struct ManageView: View {
 
     private func draftVariantBinding(for entry: RegistryEntry) -> Binding<String> {
         Binding(
-            get: { resolvedDraftVariant(for: entry) },
-            set: { draftVariant = $0 }
+            get: { @MainActor in resolvedDraftVariant(for: entry) },
+            set: { @MainActor in draftVariant = $0 }
         )
     }
 
@@ -486,7 +487,7 @@ private struct VariableRow: View {
         Task {
             do {
                 try await KeychainAuthenticator.authenticateForSecretAccess()
-                let value = try model.variableValue(service: service, variant: variant, name: name)
+                let value = try await model.variableValue(service: service, variant: variant, name: name)
                 revealedValue = value ?? ""
                 if value == nil {
                     loadError = "Could not read value. Unlock the loadout keychain and try again."

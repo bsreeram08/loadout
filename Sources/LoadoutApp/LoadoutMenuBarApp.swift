@@ -34,18 +34,22 @@ private struct LoadoutCommands: Commands {
 
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") {
-                model.preferredWindowTab = .settings
-                openWindow(id: "loadout")
-                NSApp.activate(ignoringOtherApps: true)
+                Task { @MainActor in
+                    model.preferredWindowTab = .settings
+                    openWindow(id: "loadout")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
             }
             .keyboardShortcut(",", modifiers: .command)
         }
 
         CommandGroup(after: .appInfo) {
             Button("Open Loadout…") {
-                model.preferredWindowTab = .services
-                openWindow(id: "loadout")
-                NSApp.activate(ignoringOtherApps: true)
+                Task { @MainActor in
+                    model.preferredWindowTab = .services
+                    openWindow(id: "loadout")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
             }
             .keyboardShortcut("o", modifiers: .command)
         }

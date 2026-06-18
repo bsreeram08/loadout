@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct LoadoutWindowView: View {
     @Bindable var model: LoadoutMenuModel
     @State private var tab: LoadoutWindowTab = .services

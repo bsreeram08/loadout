@@ -2,7 +2,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=scripts/lib/sign.sh
+source "${ROOT}/scripts/lib/sign.sh"
+
 BUILD_CONFIG="${BUILD_CONFIG:-release}"
+ENTITLEMENTS_PATH="${ENTITLEMENTS_PATH:-${ROOT}/Assets/Loadout.entitlements}"
 DIST="${ROOT}/dist"
 APP="${DIST}/Loadout.app"
 IDENTIFIER="${LOADOUT_BUNDLE_ID:-dev.loadout.app}"
@@ -64,14 +68,10 @@ cat > "${APP}/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-if command -v codesign >/dev/null 2>&1; then
-  codesign -s - --force --timestamp=none "${APP}/Contents/MacOS/loadout"
-  codesign -s - --force --timestamp=none "${APP}/Contents/MacOS/LoadoutApp"
-  codesign -s - --force --timestamp=none "$APP"
-  echo "signed (ad-hoc) → ${APP}"
-else
-  echo "warning: codesign not found — skip signing"
-fi
+sign_binary "${APP}/Contents/MacOS/loadout"
+sign_binary "${APP}/Contents/MacOS/LoadoutApp"
+sign_binary "$APP"
+echo "signed ($(signing_label)) → ${APP}"
 
 echo "built → ${APP}"
 echo ""

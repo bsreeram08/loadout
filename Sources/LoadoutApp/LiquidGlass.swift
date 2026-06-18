@@ -1,12 +1,8 @@
 import SwiftUI
 
 enum LiquidGlass {
-    static var isAvailable: Bool {
-        if #available(macOS 26, *) {
-            return true
-        }
-        return false
-    }
+    /// Reserved for a future macOS 26+ glass build lane when CI ships that SDK.
+    static var isAvailable: Bool { false }
 }
 
 extension View {
@@ -15,11 +11,7 @@ extension View {
         cornerRadius: CGFloat = 12,
         material: Material = .ultraThinMaterial
     ) -> some View {
-        if #available(macOS 26, *) {
-            glassEffect(in: .rect(cornerRadius: cornerRadius))
-        } else {
-            background(material, in: RoundedRectangle(cornerRadius: cornerRadius))
-        }
+        background(material, in: RoundedRectangle(cornerRadius: cornerRadius))
     }
 
     @ViewBuilder
@@ -27,20 +19,12 @@ extension View {
         cornerRadius: CGFloat = 12,
         material: Material = .thinMaterial
     ) -> some View {
-        if #available(macOS 26, *) {
-            glassEffect(.regular.tint(.accentColor.opacity(0.15)), in: .rect(cornerRadius: cornerRadius))
-        } else {
-            background(material, in: RoundedRectangle(cornerRadius: cornerRadius))
-        }
+        background(material, in: RoundedRectangle(cornerRadius: cornerRadius))
     }
 
     @ViewBuilder
     func glassInteractiveCapsule() -> some View {
-        if #available(macOS 26, *) {
-            glassEffect(.regular.interactive(), in: .capsule)
-        } else {
-            background(.ultraThinMaterial, in: Capsule())
-        }
+        background(.ultraThinMaterial, in: Capsule())
     }
 }
 

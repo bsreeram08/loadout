@@ -4,6 +4,26 @@ All notable changes to Loadout are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Versions use `MAJOR.MINOR.PATCH.MICRO`.
 
+## [0.2.0.3] - 2026-06-19
+
+### Added
+
+- **GitHub Release assets** — each tag ships CLI tarball (`loadout-*-macos-*.tar.gz`) and menu bar app zip (`Loadout-*-macos-*.zip`) for arm64 and x86_64
+- **Release workflow** — `.github/workflows/release.yml` builds, signs, notarizes (when secrets configured), and publishes both binaries
+- **`scripts/package-release.sh`** — local release packaging; supports `SIGN_IDENTITY` + `NOTARIZE=1` for Developer ID builds
+
+### Changed
+
+- **Unified window chrome** — shared header, brand mark, and segmented navigation on every tab
+- **Settings in main window** — General and Storage tabs live inside Loadout (no separate preferences window)
+- CLI installer preserves Developer ID signatures from the app bundle instead of re-signing ad-hoc
+
+### Fixed
+
+- Menu bar stuck on **Loading…** when keychain scan was cancelled on each menu open
+- Tab picker renders native segmented buttons instead of plain text labels
+- Consistent empty-state layout across Services, Export, About, and Settings
+
 ## [0.2.0.2] - 2026-06-19
 
 ### Added
