@@ -1,26 +1,53 @@
+import AppKit
 import SwiftUI
 
 @main
 struct LoadoutMenuBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var model = LoadoutMenuModel()
+    @State private var model = LoadoutMenuModel()
 
     var body: some Scene {
         MenuBarExtra {
             LoadoutMenuView(model: model)
         } label: {
-            MenuBarIconLabel()
+            MenuBarIconLabel(showsProdWarning: model.hasProdSelected)
         }
         .menuBarExtraStyle(.menu)
 
-        Window("Manage Loadout", id: "manage") {
-            ManageView(model: model)
+        Window("Loadout", id: "loadout") {
+            LoadoutWindowView(model: model)
         }
-        .defaultSize(width: 560, height: 400)
+        .defaultSize(width: 720, height: 520)
+        .windowToolbarStyle(.unified)
+        .commands {
+            LoadoutCommands()
+        }
 
-        Window("Settings", id: "settings") {
-            SettingsView(model: model)
+        Settings {
+            SettingsSceneView(model: model)
         }
-        .defaultSize(width: 480, height: 360)
+    }
+}
+
+private struct LoadoutCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {}
+
+        CommandGroup(after: .appInfo) {
+            Button("Open Loadout…") {
+                openWindow(id: "loadout")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            .keyboardShortcut("o", modifiers: .command)
+        }
+
+        CommandGroup(replacing: .appTermination) {
+            Button("Quit Loadout") {
+                NSApp.terminate(nil)
+            }
+            .keyboardShortcut("q", modifiers: .command)
+        }
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AddServiceSheet: View {
-    @ObservedObject var model: LoadoutMenuModel
+    @Bindable var model: LoadoutMenuModel
 
     @Environment(\.dismiss) private var dismiss
     @State private var serviceName = ""
@@ -10,50 +10,43 @@ struct AddServiceSheet: View {
     @State private var variableValue = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Add service")
-                .font(.headline)
-
-            Text("Creates a service with its first variable in Keychain.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            TextField("Service name", text: $serviceName)
-                .textFieldStyle(.roundedBorder)
-
-            TextField("Variant name", text: $variantName)
-                .textFieldStyle(.roundedBorder)
-
-            TextField("Variable name", text: $variableName)
-                .textFieldStyle(.roundedBorder)
-
-            SecureField("Secret value", text: $variableValue)
-                .textFieldStyle(.roundedBorder)
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Create") {
-                    model.setVariable(
-                        service: serviceName,
-                        variant: variantName,
-                        name: variableName,
-                        value: variableValue
-                    )
-                    model.manageSelection = serviceName
-                    dismiss()
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Service name", text: $serviceName)
+                    TextField("Variant name", text: $variantName)
+                    TextField("Variable name", text: $variableName)
+                    SecureField("Secret value", text: $variableValue)
+                } footer: {
+                    Text("Creates a service with its first variable in Keychain.")
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(
-                    serviceName.isEmpty
-                        || variantName.isEmpty
-                        || variableName.isEmpty
-                        || variableValue.isEmpty
-                )
+            }
+            .formStyle(.grouped)
+            .navigationTitle("Add service")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        model.setVariable(
+                            service: serviceName,
+                            variant: variantName,
+                            name: variableName,
+                            value: variableValue
+                        )
+                        model.manageSelection = serviceName
+                        dismiss()
+                    }
+                    .disabled(
+                        serviceName.isEmpty
+                            || variantName.isEmpty
+                            || variableName.isEmpty
+                            || variableValue.isEmpty
+                    )
+                }
             }
         }
-        .padding(20)
-        .frame(width: 380)
+        .frame(width: 420, height: 300)
     }
 }

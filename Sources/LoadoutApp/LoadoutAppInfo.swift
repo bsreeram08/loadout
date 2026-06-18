@@ -1,6 +1,8 @@
 import Foundation
+import LoadoutCore
 
 enum LoadoutAppInfo {
-    static let version = "0.2.0.1"
+    static let version = LoadoutVersion.current
     static let name = "Loadout"
+    static let bundleIdentifier = "dev.loadout.app"
 }

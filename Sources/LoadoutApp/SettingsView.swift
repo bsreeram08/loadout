@@ -1,29 +1,7 @@
 import SwiftUI
 
-struct SettingsView: View {
-    @ObservedObject var model: LoadoutMenuModel
-
-    var body: some View {
-        TabView {
-            GeneralSettingsTab(model: model)
-                .tabItem { Label("General", systemImage: "gearshape") }
-
-            PathsSettingsTab(model: model)
-                .tabItem { Label("Paths", systemImage: "folder") }
-
-            ExportSettingsTab(model: model)
-                .tabItem { Label("Export", systemImage: "terminal") }
-
-            AboutSettingsTab()
-                .tabItem { Label("About", systemImage: "info.circle") }
-        }
-        .frame(width: 480, height: 360)
-        .onAppear { model.refresh() }
-    }
-}
-
-private struct GeneralSettingsTab: View {
-    @ObservedObject var model: LoadoutMenuModel
+struct GeneralSettingsTab: View {
+    @Bindable var model: LoadoutMenuModel
 
     var body: some View {
         Form {
@@ -63,8 +41,8 @@ private struct GeneralSettingsTab: View {
     }
 }
 
-private struct PathsSettingsTab: View {
-    @ObservedObject var model: LoadoutMenuModel
+struct PathsSettingsTab: View {
+    let model: LoadoutMenuModel
 
     var body: some View {
         Form {
@@ -97,8 +75,8 @@ private struct PathsSettingsTab: View {
     }
 }
 
-private struct ExportSettingsTab: View {
-    @ObservedObject var model: LoadoutMenuModel
+struct ExportSettingsTab: View {
+    let model: LoadoutMenuModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -109,18 +87,15 @@ private struct ExportSettingsTab: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            ScrollView {
-                Text(model.exportPreview.isEmpty ? "# nothing selected" : model.exportPreview)
-                    .font(.system(.caption, design: .monospaced))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-                    .padding(8)
+            GlassCodePanel {
+                ScrollView {
+                    Text(model.exportPreview.isEmpty ? "# nothing selected" : model.exportPreview)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay {
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.secondary.opacity(0.2))
-            }
 
             Button("How to reload open terminals…") {
                 model.showReloadHint()
@@ -130,12 +105,10 @@ private struct ExportSettingsTab: View {
     }
 }
 
-private struct AboutSettingsTab: View {
+struct AboutSettingsTab: View {
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 40))
-                .foregroundStyle(.secondary)
+            GlassIconBadge(systemImage: "slider.horizontal.3")
             Text(LoadoutAppInfo.name)
                 .font(.title2)
             Text("Version \(LoadoutAppInfo.version)")

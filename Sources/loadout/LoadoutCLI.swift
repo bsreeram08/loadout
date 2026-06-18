@@ -8,6 +8,7 @@ struct LoadoutCLI: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "loadout",
         abstract: "Local-first per-service environment profiles for macOS terminals.",
+        version: LoadoutVersion.current,
         subcommands: [
             Export.self,
             Select.self,
