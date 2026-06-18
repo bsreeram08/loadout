@@ -2,9 +2,19 @@ import XCTest
 @testable import LoadoutCore
 
 final class ZshrcImporterTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        try KeychainSearchListGuard.ensureLoginKeychainOnly()
         setenv("LOADOUT_SKIP_PARTITION", "1", 1)
+    }
+
+    override func tearDownWithError() throws {
+        let store = KeychainStore()
+        for service in ["worldline", "bambora", "swish"] {
+            _ = try? store.deleteService(service)
+        }
+        unsetenv("LOADOUT_SKIP_PARTITION")
+        try super.tearDownWithError()
     }
 
     private var fixtureURL: URL {

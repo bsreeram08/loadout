@@ -1,10 +1,28 @@
 import XCTest
 @testable import LoadoutCore
 
+/// Fast unit tests using SecItem API (LOADOUT_SKIP_PARTITION). Production path is covered by KeychainIntegrationTests.
 final class KeychainCRUDTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        try KeychainSearchListGuard.ensureLoginKeychainOnly()
         setenv("LOADOUT_SKIP_PARTITION", "1", 1)
+    }
+
+    override func tearDown() {
+        unsetenv("LOADOUT_SKIP_PARTITION")
+        super.tearDown()
+    }
+
+    func testSetRoundTripsValue() throws {
+        let store = KeychainStore()
+        let service = "testsvc\(UUID().uuidString.prefix(6).lowercased())"
+        try store.set(service: service, variant: "dev", variable: "API_KEY", value: "secret-value")
+        XCTAssertEqual(
+            try store.get(service: service, variant: "dev", variable: "API_KEY"),
+            "secret-value"
+        )
+        _ = try store.deleteService(service)
     }
 
     func testDeleteVariableRemovesFromRegistry() throws {

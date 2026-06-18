@@ -11,7 +11,9 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+      - name: Build CLI for integration tests
+        run: swift build --product loadout
       - name: Run tests
-        run: swift test
+        run: LOADOUT_TEST_BINARY=$PWD/.build/debug/loadout swift test
       - name: Release build
         run: swift build -c release --product loadout --product LoadoutApp

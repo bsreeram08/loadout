@@ -17,6 +17,12 @@ final class KeychainAccessTests: XCTestCase {
         XCTAssertTrue(KeychainAccess.executablePath.hasPrefix("/"))
     }
 
+    func testSecretAccessSkipsAuthenticationInTestMode() async throws {
+        setenv("LOADOUT_SKIP_PARTITION", "1", 1)
+        defer { unsetenv("LOADOUT_SKIP_PARTITION") }
+        try await KeychainAuthenticator.authenticateForSecretAccess()
+    }
+
     func testAccessPolicyMentionsDedicatedKeychain() throws {
         setenv("LOADOUT_SKIP_PARTITION", "1", 1)
         let store = KeychainStore()
