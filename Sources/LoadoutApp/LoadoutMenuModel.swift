@@ -117,8 +117,11 @@ final class LoadoutMenuModel {
         variableNamesByKey[Self.variantKey(service: service, variant: variant)] ?? []
     }
 
-    func variableValue(service: String, variant: String, name: String) throws -> String? {
-        try keychain.get(service: service, variant: variant, variable: name)
+    func variableValue(service: String, variant: String, name: String) async throws -> String? {
+        let keychain = self.keychain
+        return try await Task.detached(priority: .userInitiated) {
+            try keychain.get(service: service, variant: variant, variable: name)
+        }.value
     }
 
     func select(service: String, variant: String) {

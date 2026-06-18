@@ -3,6 +3,13 @@ import Security
 
 /// Dedicated Keychain for Loadout — empty password, `-A` items survive rebuilds without repair.
 public enum LoadoutKeychain {
+    private static let blockingQueueKey = DispatchSpecificKey<UInt8>()
+    private static let blockingQueue: DispatchQueue = {
+        let queue = DispatchQueue(label: "dev.loadout.keychain.blocking", qos: .userInitiated)
+        queue.setSpecific(key: blockingQueueKey, value: 1)
+        return queue
+    }()
+
     public static let fileName = "loadout.keychain-db"
 
     public static var path: String {
@@ -21,45 +28,88 @@ public enum LoadoutKeychain {
     }
 
     static func ensureReady() throws {
+        try withBlocking {
+            try ensureReadyOnBlockingQueue()
+        }
+    }
+
+    private static func ensureReadyOnBlockingQueue() throws {
         if ProcessInfo.processInfo.environment["LOADOUT_SKIP_PARTITION"] == "1" {
             return
         }
         if !FileManager.default.fileExists(atPath: path) {
-            try create()
+            try createOnBlockingQueue()
+            return
         }
-        try unlock()
-        try setSearchList()
+        try unlockOnBlockingQueue()
+        try setSearchListOnBlockingQueue()
     }
 
     static func create() throws {
-        try runSecurity(["create-keychain", "-p", "", path], allowFailure: true)
-        try runSecurity(["set-keychain-settings", "-lut", "86400", path])
-        try unlock()
-        try setSearchList()
+        try withBlocking { try createOnBlockingQueue() }
+    }
+
+    private static func createOnBlockingQueue() throws {
+        try runSecurityOnBlockingQueue(["create-keychain", "-p", "", path], allowFailure: true)
+        try runSecurityOnBlockingQueue(["set-keychain-settings", "-lut", "86400", path])
+        try unlockOnBlockingQueue()
+        try setSearchListOnBlockingQueue()
     }
 
     static func unlock() throws {
-        try runSecurity(["unlock-keychain", "-p", "", path], allowFailure: true)
+        try withBlocking { try unlockOnBlockingQueue() }
+    }
+
+    private static func unlockOnBlockingQueue() throws {
+        try runSecurityOnBlockingQueue(["unlock-keychain", "-p", "", path], allowFailure: true)
     }
 
     static func setSearchList() throws {
-        try runSecurity(["list-keychains", "-d", "user", "-s", path, loginPath])
+        try withBlocking { try setSearchListOnBlockingQueue() }
+    }
+
+    private static func setSearchListOnBlockingQueue() throws {
+        try runSecurityOnBlockingQueue(["list-keychains", "-d", "user", "-s", path, loginPath])
     }
 
     static func setLoginSearchList() throws {
-        try runSecurity(["list-keychains", "-d", "user", "-s", loginPath])
+        try withBlocking {
+            try runSecurityOnBlockingQueue(["list-keychains", "-d", "user", "-s", loginPath])
+        }
     }
 
     static func withExclusiveSearchList<T>(_ keychain: String, _ body: () throws -> T) throws -> T {
-        let previous = try currentSearchList()
-        defer {
-            try? runSecurity(["list-keychains", "-d", "user", "-s"] + previous, allowFailure: true)
+        try withBlocking {
+            let previous = try currentSearchListOnBlockingQueue()
+            defer {
+                try? runSecurityOnBlockingQueue(
+                    ["list-keychains", "-d", "user", "-s"] + previous,
+                    allowFailure: true
+                )
+            }
+            try runSecurityOnBlockingQueue(["list-keychains", "-d", "user", "-s", keychain])
+            return try body()
         }
-        try runSecurity(["list-keychains", "-d", "user", "-s", keychain])
-        return try body()
     }
 
-    private static func currentSearchList() throws -> [String] {
+    static func dumpKeychain(_ keychainPath: String) throws -> String {
+        try withBlocking {
+            let output = Pipe()
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+            process.arguments = ["dump-keychain", "-d", keychainPath]
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                return ""
+            }
+            return String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        }
+    }
+
+    private static func currentSearchListOnBlockingQueue() throws -> [String] {
         let output = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
@@ -85,50 +135,62 @@ public enum LoadoutKeychain {
             return
         }
 
-        try ensureReady()
-        // `-U` (update) hangs on custom keychains; delete-then-add is reliable.
-        try runSecurity([
-            "delete-generic-password",
-            "-s", service,
-            "-a", account,
-            path,
-        ], allowFailure: true)
+        try withBlocking {
+            try ensureReadyOnBlockingQueue()
+            // `-U` (update) hangs on custom keychains; delete-then-add is reliable.
+            try runSecurityOnBlockingQueue([
+                "delete-generic-password",
+                "-s", service,
+                "-a", account,
+                path,
+            ], allowFailure: true)
 
-        let stderr = Pipe()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        // Pass -w explicitly. Stdin after run() races: security reads empty password.
-        process.arguments = [
-            "add-generic-password",
-            "-a", account,
-            "-s", service,
-            "-w", value,
-            "-A",
-            path,
-        ]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = stderr
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let detail = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            throw LoadoutError.io(
-                "failed to store \(service)/\(account) (exit \(process.terminationStatus)"
-                    + (detail.isEmpty ? ")" : ": \(detail))")
-            )
-        }
+            let stderr = Pipe()
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+            // Pass -w explicitly. Stdin after run() races: security reads empty password.
+            process.arguments = [
+                "add-generic-password",
+                "-a", account,
+                "-s", service,
+                "-w", value,
+                "-A",
+                path,
+            ]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = stderr
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                let detail = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                throw LoadoutError.io(
+                    "failed to store \(service)/\(account) (exit \(process.terminationStatus)"
+                        + (detail.isEmpty ? ")" : ": \(detail))")
+                )
+            }
 
-        guard let readBack = try readSecret(keychain: path, service: service, account: account),
-              readBack == value
-        else {
-            throw LoadoutError.io(
-                "read-back verification failed for \(service)/\(account) — stored data mismatch"
-            )
+            guard let readBack = try readSecretOnBlockingQueue(keychain: path, service: service, account: account),
+                  readBack == value
+            else {
+                throw LoadoutError.io(
+                    "read-back verification failed for \(service)/\(account) — stored data mismatch"
+                )
+            }
         }
     }
 
     static func readSecret(keychain: String, service: String, account: String) throws -> String? {
+        try withBlocking {
+            try readSecretOnBlockingQueue(keychain: keychain, service: service, account: account)
+        }
+    }
+
+    private static func readSecretOnBlockingQueue(
+        keychain: String,
+        service: String,
+        account: String
+    ) throws -> String? {
         let output = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
@@ -152,7 +214,9 @@ public enum LoadoutKeychain {
     }
 
     static func deleteFromLogin(service: String, account: String) throws {
-        try delete(service: service, account: account, keychain: loginPath)
+        try withBlocking {
+            try deleteOnBlockingQueue(service: service, account: account, keychain: loginPath)
+        }
     }
 
     static func delete(service: String, account: String) throws {
@@ -160,12 +224,14 @@ public enum LoadoutKeychain {
             try deleteViaSecItem(service: service, account: account)
             return
         }
-        try ensureReady()
-        try delete(service: service, account: account, keychain: path)
+        try withBlocking {
+            try ensureReadyOnBlockingQueue()
+            try deleteOnBlockingQueue(service: service, account: account, keychain: path)
+        }
     }
 
-    private static func delete(service: String, account: String, keychain: String) throws {
-        try runSecurity([
+    private static func deleteOnBlockingQueue(service: String, account: String, keychain: String) throws {
+        try runSecurityOnBlockingQueue([
             "delete-generic-password",
             "-s", service,
             "-a", account,
@@ -211,6 +277,15 @@ public enum LoadoutKeychain {
     }
 
     private static func runSecurity(_ arguments: [String], allowFailure: Bool = false) throws {
+        try withBlocking {
+            try runSecurityOnBlockingQueue(arguments, allowFailure: allowFailure)
+        }
+    }
+
+    private static func runSecurityOnBlockingQueue(
+        _ arguments: [String],
+        allowFailure: Bool = false
+    ) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
         process.arguments = arguments
@@ -223,5 +298,12 @@ public enum LoadoutKeychain {
                 "security \(arguments.first ?? "") failed (exit \(process.terminationStatus))"
             )
         }
+    }
+
+    private static func withBlocking<T>(_ body: () throws -> T) rethrows -> T {
+        if DispatchQueue.getSpecific(key: blockingQueueKey) != nil {
+            return try body()
+        }
+        return try blockingQueue.sync(execute: body)
     }
 }

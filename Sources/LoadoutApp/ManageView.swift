@@ -497,23 +497,32 @@ private struct VariableRow: View {
         Task {
             do {
                 try await KeychainAuthenticator.authenticateForSecretAccess()
-                let value = try await model.variableValue(service: service, variant: variant, name: name)
-                revealedValue = value ?? ""
-                if value == nil {
-                    loadError = "Could not read value. Unlock the loadout keychain and try again."
-                    isRevealed = false
-                } else {
-                    isRevealed = true
+                let value = try await model.variableValue(
+                    service: service,
+                    variant: variant,
+                    name: name
+                )
+                await MainActor.run {
+                    revealedValue = value ?? ""
+                    if value == nil {
+                        loadError = "Could not read value. Unlock the loadout keychain and try again."
+                        isRevealed = false
+                    } else {
+                        isRevealed = true
+                    }
+                    isLoading = false
                 }
             } catch {
-                if KeychainAuthenticator.isUserCancellation(error) {
-                    hideValue()
-                } else {
-                    loadError = error.localizedDescription
-                    isRevealed = false
+                await MainActor.run {
+                    if KeychainAuthenticator.isUserCancellation(error) {
+                        hideValue()
+                    } else {
+                        loadError = error.localizedDescription
+                        isRevealed = false
+                    }
+                    isLoading = false
                 }
             }
-            isLoading = false
         }
     }
 

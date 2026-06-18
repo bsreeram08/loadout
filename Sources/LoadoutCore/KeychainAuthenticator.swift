@@ -8,31 +8,11 @@ public enum KeychainAuthenticator {
             return
         }
 
-        let context = LAContext()
-        context.localizedReason = "Authenticate to view this secret"
-        context.localizedFallbackTitle = "Use Password"
-
-        var policyError: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) else {
-            try KeychainAccess.unlockLoginKeychain()
-            return
-        }
-
-        let success = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
-            context.evaluatePolicy(
-                .deviceOwnerAuthentication,
-                localizedReason: "Authenticate to view this secret"
-            ) { ok, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ok)
-                }
-            }
-        }
-
-        guard success else {
-            throw LoadoutError.io("authentication cancelled")
+        let needsPasswordFallback = try await evaluateBiometrics()
+        if needsPasswordFallback {
+            try await Task.detached(priority: .userInitiated) {
+                try KeychainAccess.unlockLoginKeychain()
+            }.value
         }
     }
 
@@ -49,47 +29,101 @@ public enum KeychainAuthenticator {
             return
         }
 
+        let needsPasswordFallback = try runOnMainActorSync {
+            try evaluateBiometricsSync()
+        }
+
+        if needsPasswordFallback {
+            try KeychainAccess.unlockLoginKeychain()
+        }
+    }
+
+    @MainActor
+    private static func evaluateBiometrics() async throws -> Bool {
+        let context = LAContext()
+        context.localizedReason = "Authenticate to view this secret"
+        context.localizedFallbackTitle = "Use Password"
+
+        var policyError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) else {
+            return true
+        }
+
+        let success: Bool = try await withCheckedThrowingContinuation { continuation in
+            context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: "Authenticate to view this secret"
+            ) { ok, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ok)
+                }
+            }
+        }
+
+        guard success else {
+            throw LoadoutError.io("authentication cancelled")
+        }
+
+        return false
+    }
+
+    @MainActor
+    private static func evaluateBiometricsSync() throws -> Bool {
         let context = LAContext()
         context.localizedReason = "Authorize loadout to update Keychain access"
         context.localizedFallbackTitle = "Use Password"
 
         var policyError: NSError?
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) else {
-            try KeychainAccess.unlockLoginKeychain()
-            return
+            return true
         }
 
         var success = false
         var evaluationError: Error?
         let semaphore = DispatchSemaphore(value: 0)
 
-        let evaluate = {
-            context.evaluatePolicy(
-                .deviceOwnerAuthentication,
-                localizedReason: "Authorize loadout to fix Keychain access"
-            ) { ok, error in
-                success = ok
-                evaluationError = error
-                semaphore.signal()
-            }
+        context.evaluatePolicy(
+            .deviceOwnerAuthentication,
+            localizedReason: "Authorize loadout to fix Keychain access"
+        ) { ok, error in
+            success = ok
+            evaluationError = error
+            semaphore.signal()
         }
 
-        if Thread.isMainThread {
-            evaluate()
-        } else {
-            DispatchQueue.main.sync(execute: evaluate)
-        }
-
-        semaphore.wait()
-
-        if success {
-            return
+        while semaphore.wait(timeout: .now()) == .timedOut {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.05))
         }
 
         if let evaluationError {
-            throw LoadoutError.io("authentication failed: \(evaluationError.localizedDescription)")
+            throw evaluationError
         }
 
-        try KeychainAccess.unlockLoginKeychain()
+        guard success else {
+            throw LoadoutError.io("authentication failed")
+        }
+
+        return false
+    }
+
+    private static func runOnMainActorSync<T>(_ body: @MainActor @escaping () throws -> T) throws -> T {
+        if Thread.isMainThread {
+            return try MainActor.assumeIsolated(body)
+        }
+
+        var result: Result<T, Error>?
+        let semaphore = DispatchSemaphore(value: 0)
+        DispatchQueue.main.async {
+            do {
+                result = .success(try MainActor.assumeIsolated(body))
+            } catch {
+                result = .failure(error)
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return try result!.get()
     }
 }

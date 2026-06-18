@@ -81,18 +81,8 @@ public struct KeychainCatalog: Sendable {
     }
 
     private static func loadItemsFromKeychainFile(_ path: String) throws -> [Item] {
-        let output = Pipe()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        process.arguments = ["dump-keychain", "-d", path]
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            return []
-        }
-        let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let text = try LoadoutKeychain.dumpKeychain(path)
+        guard !text.isEmpty else { return [] }
         return parseDumpKeychain(text)
     }
 

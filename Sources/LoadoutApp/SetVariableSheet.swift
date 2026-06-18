@@ -80,7 +80,7 @@ struct SetVariableSheet: View {
             loadError = nil
             do {
                 try await KeychainAuthenticator.authenticateForSecretAccess()
-                if let value = try model.variableValue(service: service, variant: variant, name: name) {
+                if let value = try await model.variableValue(service: service, variant: variant, name: name) {
                     variableValue = value
                 }
             } catch {
