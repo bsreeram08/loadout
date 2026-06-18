@@ -4,6 +4,23 @@ All notable changes to Loadout are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Versions use `MAJOR.MINOR.PATCH.MICRO`.
 
+## [0.2.0.4] - 2026-06-19
+
+### Added
+
+- **Load after restart setup** — Settings can install the Loadout shell hook, ensure the CLI is installed, and enable the login item so new terminals apply the current Active set after reboot
+- **Shell hook installer** — managed `.zshrc` block is idempotent, uses the bundled CLI path first, and preserves existing shell config
+
+### Changed
+
+- **Single visual system** — Services, Export, Settings, and About now share the same Loadout card layout instead of mixing native split/form surfaces
+- Menu bar now opens real setup screens instead of showing hint-only actions like reload/import instructions
+
+### Fixed
+
+- Inactive Services now explain when Variant changes are only browsing stored variables and offer a direct Select-for-export action
+- Secret reveal and edit flows now show authentication/keychain failures instead of looking like dead controls
+
 ## [0.2.0.3] - 2026-06-19
 
 ### Added
