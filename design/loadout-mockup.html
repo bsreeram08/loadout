@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loadout — UI redesign mockup</title>
+<style>
+  :root{
+    --bg:#ECECEE;
+    --win:#F6F6F7;
+    --panel:#FFFFFF;
+    --sidebar:#F0F0F2;
+    --ink:#1D1D1F;
+    --ink2:#6E6E73;
+    --ink3:#9A9AA0;
+    --line:rgba(0,0,0,.08);
+    --line2:rgba(0,0,0,.06);
+    --accent:#0A84FF;
+    --sel:#E5F0FF;
+    --prod:#FF453A;
+    --prodbg:#FFE9E7;
+    --test:#0A84FF;
+    --testbg:#E7F1FF;
+    --beta:#AF52DE;
+    --betabg:#F4E9FB;
+    --off:#9A9AA0;
+    --offbg:#EDEDEF;
+    --green:#34C759;
+    --shadow:0 24px 60px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
+    --radius:14px;
+    font-synthesis:none;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1A1A1C;--win:#242426;--panel:#2C2C2E;--sidebar:#202022;
+      --ink:#F2F2F4;--ink2:#A0A0A6;--ink3:#6E6E73;
+      --line:rgba(255,255,255,.10);--line2:rgba(255,255,255,.07);
+      --sel:#0B355F;--offbg:#3A3A3C;--off:#8A8A90;
+      --prodbg:#3A1E1C;--testbg:#13294A;--betabg:#2C1B3A;
+      --shadow:0 24px 60px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,"SF Pro Text","SF Pro Display","Helvetica Neue",system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 700px at 20% -10%, #d9e6ff55, transparent 60%),
+      radial-gradient(1000px 600px at 100% 110%, #ffd9ec40, transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;
+    padding:46px 24px 80px;gap:34px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .heading{text-align:center;max-width:760px}
+  .heading h1{font-size:26px;font-weight:700;letter-spacing:-.4px}
+  .heading p{color:var(--ink2);font-size:14px;margin-top:8px;line-height:1.5}
+  .stage{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
+
+  /* ---------- window chrome ---------- */
+  .window{
+    width:860px;background:var(--win);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;border:.5px solid var(--line);
+    backdrop-filter:saturate(180%) blur(20px);
+  }
+  .toolbar{
+    height:52px;display:flex;align-items:center;gap:14px;padding:0 16px;
+    background:linear-gradient(var(--win),color-mix(in srgb,var(--win) 92%, #000));
+    border-bottom:.5px solid var(--line);
+  }
+  .lights{display:flex;gap:8px;align-items:center}
+  .light{width:12px;height:12px;border-radius:50%}
+  .l-close{background:#FF5F57}.l-min{background:#FEBC2E}.l-zoom{background:#28C840}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;margin-left:6px}
+  .mark{width:22px;height:22px;border-radius:6px;
+    background:linear-gradient(135deg,#0A84FF,#5E5CE6);display:grid;place-items:center;
+    box-shadow:inset 0 0 0 .5px rgba(255,255,255,.4)}
+  .mark svg{width:13px;height:13px;color:#fff}
+  /* segmented control */
+  .segmented{
+    margin:0 auto;display:flex;background:var(--offbg);border-radius:8px;padding:2px;
+    box-shadow:inset 0 0 0 .5px var(--line2);
+  }
+  .seg{
+    display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--ink2);
+    padding:5px 13px;border-radius:6px;cursor:default;
+  }
+  .seg svg{width:13px;height:13px}
+  .seg.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.16),0 0 0 .5px var(--line)}
+  .ver{margin-left:auto;font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums}
+
+  /* ---------- active-set strip ---------- */
+  .strip{
+    display:flex;align-items:center;gap:12px;padding:9px 18px;
+    background:color-mix(in srgb,var(--win) 70%, transparent);
+    border-bottom:.5px solid var(--line);font-size:12.5px;
+  }
+  .strip .count{font-weight:600}
+  .strip .count b{color:var(--accent)}
+  .strip .dot{color:var(--ink3)}
+  .pill-warn{
+    display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+    color:var(--prod);background:var(--prodbg);padding:3px 9px;border-radius:20px;
+    box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--prod) 35%,transparent);
+  }
+  .strip .spacer{flex:1}
+  .btn{
+    font-size:12px;font-weight:500;padding:5px 12px;border-radius:7px;border:.5px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:default;display:inline-flex;align-items:center;gap:6px;
+    box-shadow:0 1px 1.5px rgba(0,0,0,.06)}
+  .btn svg{width:12px;height:12px}
+  .btn.accent{background:var(--accent);color:#fff;border-color:transparent}
+
+  /* ---------- body split ---------- */
+  .split{display:flex;height:520px}
+  .sidebar{
+    width:268px;background:var(--sidebar);border-right:.5px solid var(--line);
+    display:flex;flex-direction:column;
+  }
+  .search{padding:12px 12px 8px}
+  .search .field{
+    display:flex;align-items:center;gap:7px;background:var(--panel);border-radius:8px;
+    padding:6px 10px;border:.5px solid var(--line);color:var(--ink3);font-size:12.5px}
+  .search svg{width:13px;height:13px}
+  .scroll{overflow:auto;padding:2px 8px 12px;flex:1}
+  .group-h{
+    font-size:10.5px;font-weight:700;letter-spacing:.6px;color:var(--ink3);
+    text-transform:uppercase;padding:12px 8px 6px}
+  .srow{
+    display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:8px;cursor:default;margin-bottom:1px}
+  .srow:hover{background:color-mix(in srgb,var(--accent) 8%, transparent)}
+  .srow.sel{background:var(--sel)}
+  .srow .adot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 22%,transparent)}
+  .srow .adot.off{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ink3)}
+  .srow .name{font-size:13px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .srow.sel .name{font-weight:600}
+  .srow.dim .name{color:var(--ink2);font-weight:450}
+  .vpill{
+    font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.2px}
+  .vpill.prod{color:var(--prod);background:var(--prodbg)}
+  .vpill.test{color:var(--test);background:var(--testbg)}
+  .vpill.beta{color:var(--beta);background:var(--betabg)}
+  .vpill.off{color:var(--off);background:var(--offbg)}
+
+  /* ---------- detail ---------- */
+  .detail{flex:1;overflow:auto;padding:20px 22px}
+  .d-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
+  .d-title{font-size:20px;font-weight:700;letter-spacing:-.3px}
+  .d-sub{font-size:12.5px;color:var(--ink2);margin-top:3px;display:flex;align-items:center;gap:6px}
+  .d-sub .g{color:var(--green)}
+  .d-head .spacer{flex:1}
+  /* toggle */
+  .toggle-wrap{display:flex;align-items:center;gap:9px}
+  .toggle-wrap span{font-size:12.5px;font-weight:600;color:var(--ink2)}
+  .switch{width:40px;height:24px;border-radius:20px;background:var(--green);position:relative;
+    box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1)}
+  .switch::after{content:"";position:absolute;top:2px;left:18px;width:20px;height:20px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .switch.off{background:var(--offbg)}
+  .switch.off::after{left:2px}
+
+  .section-l{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--ink3);margin:0 0 9px 2px}
+  /* variant selector */
+  .variants{display:flex;gap:8px;margin-bottom:22px}
+  .vseg{
+    flex:1;text-align:center;padding:11px 10px;border-radius:10px;background:var(--panel);
+    border:1px solid var(--line);cursor:default;position:relative}
+  .vseg .vt{font-size:13px;font-weight:600}
+  .vseg .vc{font-size:11px;color:var(--ink3);margin-top:2px}
+  .vseg.on.prod{border-color:var(--prod);background:var(--prodbg);box-shadow:0 0 0 1px var(--prod)}
+  .vseg.on.prod .vt{color:var(--prod)}
+  .vseg.on.test{border-color:var(--test);background:var(--testbg);box-shadow:0 0 0 1px var(--test)}
+  .vseg.on.test .vt{color:var(--test)}
+  .vseg .chk{position:absolute;top:7px;right:8px;width:14px;height:14px;color:var(--prod)}
+  .vseg.test .chk{color:var(--test)}
+
+  /* variables table */
+  .vars-card{background:var(--panel);border:.5px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:22px}
+  .vhead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:.5px solid var(--line2)}
+  .vhead .t{font-size:12.5px;font-weight:600}
+  .vhead .n{font-size:11px;color:var(--ink3)}
+  .vrow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:.5px solid var(--line2)}
+  .vrow:last-child{border-bottom:none}
+  .vkey{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;width:200px;flex:none;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vval{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink3);flex:1;letter-spacing:1px}
+  .vval.shown{color:var(--ink2);letter-spacing:0}
+  .vacts{display:flex;gap:4px;opacity:.85}
+  .iconbtn{width:26px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--ink2);
+    border:.5px solid transparent}
+  .iconbtn:hover{background:var(--offbg)}
+  .iconbtn svg{width:14px;height:14px}
+  .iconbtn.danger:hover{color:var(--prod)}
+  .vadd{padding:10px 14px;font-size:12px;font-weight:500;color:var(--accent);display:flex;align-items:center;gap:6px}
+  .vadd svg{width:13px;height:13px}
+
+  .danger-row{display:flex;align-items:center;justify-content:space-between;
+    padding:12px 14px;border:.5px solid var(--line);border-radius:10px;
+    background:color-mix(in srgb,var(--prod) 4%, var(--panel))}
+  .danger-row .dl{font-size:12px;color:var(--ink2)}
+  .danger-row .db{font-size:12px;font-weight:600;color:var(--prod);
+    padding:5px 12px;border-radius:7px;border:.5px solid color-mix(in srgb,var(--prod) 40%,transparent)}
+
+  /* ---------- menu bar popover ---------- */
+  .popover{
+    width:280px;background:color-mix(in srgb,var(--panel) 88%, transparent);
+    backdrop-filter:saturate(180%) blur(30px);
+    border-radius:12px;box-shadow:var(--shadow);border:.5px solid var(--line);
+    overflow:hidden;align-self:flex-start;margin-top:6px}
+  .pv-head{display:flex;align-items:center;gap:9px;padding:13px 14px 11px}
+  .pv-head .mark{width:24px;height:24px}
+  .pv-head .pt{font-weight:700;font-size:14px}
+  .pv-head .ps{font-size:11px;color:var(--ink2)}
+  .pv-warn{margin:0 12px 6px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+    color:var(--prod);background:var(--prodbg);padding:6px 9px;border-radius:8px}
+  .pv-warn svg{width:13px;height:13px}
+  .pv-sec{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink3);padding:8px 14px 4px}
+  .pv-row{display:flex;align-items:center;gap:9px;padding:7px 14px}
+  .pv-row:hover{background:color-mix(in srgb,var(--accent) 90%, #fff);color:#fff}
+  .pv-row:hover .pv-name,.pv-row:hover .vpill{color:#fff !important}
+  .pv-row .adot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  .pv-name{font-size:13px;font-weight:500;flex:1}
+  .pv-div{height:.5px;background:var(--line);margin:6px 0}
+  .pv-item{padding:7px 14px;font-size:13px;color:var(--ink)}
+  .pv-item:hover{background:var(--accent);color:#fff}
+  .pv-foot{padding:8px 14px 11px;font-size:11px;color:var(--ink3)}
+  .barchip{display:inline-flex;align-items:center;gap:7px;background:var(--win);border:.5px solid var(--line);
+    border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;box-shadow:var(--shadow);margin-bottom:10px}
+  .barchip .mark{width:16px;height:16px;border-radius:4px}
+  .barchip .mark svg{width:9px;height:9px}
+  .barchip .b{color:var(--accent)}
+  .caption{font-size:11.5px;color:var(--ink2);text-align:center;margin-top:12px;font-weight:500}
+
+  /* ---------- orchestrated entrance + micro-interactions ---------- */
+  @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+  @keyframes slidein{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+  .window{animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
+  .popover{animation:rise .7s .12s cubic-bezier(.2,.8,.2,1) both}
+  .srow{animation:slidein .5s both}
+  .scroll .srow:nth-child(2){animation-delay:.18s}
+  .scroll .srow:nth-child(3){animation-delay:.23s}
+  .scroll .srow:nth-child(4){animation-delay:.28s}
+  .scroll .srow:nth-child(n+6){animation-delay:.34s}
+  .vseg{animation:rise .5s both;transition:transform .18s ease}
+  .variants .vseg:nth-child(1){animation-delay:.30s}
+  .variants .vseg:nth-child(2){animation-delay:.36s}
+  .variants .vseg:nth-child(3){animation-delay:.42s}
+  .vseg:not(.on):hover{transform:translateY(-2px)}
+  .vrow{animation:slidein .5s both}
+  .vrow:nth-child(2){animation-delay:.40s}
+  .vrow:nth-child(3){animation-delay:.46s}
+  .vrow:nth-child(4){animation-delay:.52s}
+  .srow,.iconbtn,.btn,.vseg,.switch,.danger-row .db{transition:background .15s ease,transform .15s ease,box-shadow .15s ease,color .15s ease}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(0,0,0,.12)}
+  .danger-row .db:hover{background:var(--prod);color:#fff}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+  <div class="heading">
+    <h1>Loadout — redesigned</h1>
+    <p>One active-set dashboard. Color-coded variants (prod reads as dangerous at a glance), searchable sidebar grouped by Active / Inactive, and a single clean detail pane that replaces the four overlapping cards.</p>
+  </div>
+
+  <div class="stage">
+    <!-- ============ MAIN WINDOW ============ -->
+    <div class="window">
+      <!-- toolbar -->
+      <div class="toolbar">
+        <div class="lights"><span class="light l-close"></span><span class="light l-min"></span><span class="light l-zoom"></span></div>
+        <div class="brand">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="2.4" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="2.4" fill="currentColor" stroke="none"/></svg></span>
+          Loadout
+        </div>
+        <div class="segmented">
+          <div class="seg on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>Services</div>
+          <div class="seg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-5-6-5M12 19h8"/></svg>Export</div>
+          <div class="seg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 14a1.6 1.6 0 0 0-1.5-1H1a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 3 7"/></svg>Settings</div>
+          <div class="seg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>About</div>
+        </div>
+        <span class="ver">v0.2.0.4</span>
+      </div>
+
+      <!-- active-set strip -->
+      <div class="strip">
+        <span class="count"><b>3</b> services active</span>
+        <span class="dot">·</span>
+        <span>14 variables</span>
+        <span class="pill-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg> worldline · prod</span>
+        <span class="spacer"></span>
+        <span class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg> Copy export</span>
+      </div>
+
+      <!-- split -->
+      <div class="split">
+        <!-- sidebar -->
+        <div class="sidebar">
+          <div class="search">
+            <div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Search services</div>
+          </div>
+          <div class="scroll">
+            <div class="group-h">Active · 3</div>
+            <div class="srow sel"><span class="adot"></span><span class="name">worldline</span><span class="vpill prod">prod</span></div>
+            <div class="srow"><span class="adot"></span><span class="name">bambora</span><span class="vpill test">test</span></div>
+            <div class="srow"><span class="adot"></span><span class="name">stripe</span><span class="vpill test">test</span></div>
+
+            <div class="group-h">Inactive · 49</div>
+            <div class="srow dim"><span class="adot off"></span><span class="name">aws</span><span class="vpill off">off</span></div>
+            <div class="srow dim"><span class="adot off"></span><span class="name">datadog</span><span class="vpill off">off</span></div>
+            <div class="srow dim"><span class="adot off"></span><span class="name">github</span><span class="vpill off">off</span></div>
+            <div class="srow dim"><span class="adot off"></span><span class="name">openai</span><span class="vpill off">off</span></div>
+            <div class="srow dim"><span class="adot off"></span><span class="name">postgres</span><span class="vpill off">off</span></div>
+            <div class="srow dim"><span class="adot off"></span><span class="name">redis</span><span class="vpill off">off</span></div>
+            <div class="srow dim"><span class="adot off"></span><span class="name">sendgrid</span><span class="vpill off">off</span></div>
+            <div class="srow dim"><span class="adot off"></span><span class="name">twilio</span><span class="vpill off">off</span></div>
+          </div>
+        </div>
+
+        <!-- detail -->
+        <div class="detail">
+          <div class="d-head">
+            <div>
+              <div class="d-title">worldline</div>
+              <div class="d-sub"><svg class="g" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> Exporting variant <b style="color:var(--prod)">prod</b></div>
+            </div>
+            <div class="spacer"></div>
+            <div class="toggle-wrap"><span>Active</span><div class="switch"></div></div>
+          </div>
+
+          <div class="section-l">Variant</div>
+          <div class="variants">
+            <div class="vseg on prod">
+              <svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+              <div class="vt">prod</div><div class="vc">6 vars</div>
+            </div>
+            <div class="vseg test"><div class="vt">test</div><div class="vc">6 vars</div></div>
+            <div class="vseg"><div class="vt">beta</div><div class="vc">4 vars</div></div>
+          </div>
+
+          <div class="section-l">Variables · prod</div>
+          <div class="vars-card">
+            <div class="vhead"><span class="t">6 variables</span><span class="n">stored in loadout.keychain</span></div>
+            <div class="vrow">
+              <span class="vkey">WL_API_KEY</span>
+              <span class="vval">••••••••••••</span>
+              <span class="vacts">
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></span>
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
+                <span class="iconbtn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span>
+              </span>
+            </div>
+            <div class="vrow">
+              <span class="vkey">WL_ENDPOINT</span>
+              <span class="vval shown">https://api.worldline.com/v2</span>
+              <span class="vacts">
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></span>
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
+                <span class="iconbtn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span>
+              </span>
+            </div>
+            <div class="vrow">
+              <span class="vkey">WL_MERCHANT_ID</span>
+              <span class="vval">••••••••</span>
+              <span class="vacts">
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></span>
+                <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
+                <span class="iconbtn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span>
+              </span>
+            </div>
+            <div class="vadd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg> Add variable</div>
+          </div>
+
+          <div class="section-l">Manage</div>
+          <div class="danger-row">
+            <span class="dl">Removes worldline and all variants from Keychain.</span>
+            <span class="db">Delete service…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MENU BAR POPOVER ============ -->
+    <div>
+      <div class="barchip">
+        <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
+        Loadout <span class="b">· 3</span>
+      </div>
+      <div class="popover">
+        <div class="pv-head">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="2.4" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="2.4" fill="currentColor" stroke="none"/></svg></span>
+          <div><div class="pt">Loadout</div><div class="ps">3 active · 14 variables</div></div>
+        </div>
+        <div class="pv-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg> prod variant active — worldline</div>
+        <div class="pv-sec">Active</div>
+        <div class="pv-row"><span class="adot"></span><span class="pv-name">worldline</span><span class="vpill prod">prod ›</span></div>
+        <div class="pv-row"><span class="adot"></span><span class="pv-name">bambora</span><span class="vpill test">test ›</span></div>
+        <div class="pv-row"><span class="adot"></span><span class="pv-name">stripe</span><span class="vpill test">test ›</span></div>
+        <div class="pv-div"></div>
+        <div class="pv-item">Manage services…</div>
+        <div class="pv-item">Settings…</div>
+        <div class="pv-div"></div>
+        <div class="pv-foot">52 services stored · ⌘Q to quit</div>
+      </div>
+      <div class="caption">Menu bar dropdown</div>
+    </div>
+  </div>
+</body>
+</html>

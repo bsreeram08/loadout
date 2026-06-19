@@ -18,16 +18,24 @@ struct MenuContext {
     let errorMessage: String?
 }
 
+struct LoadoutAlert: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
 @Observable
 @MainActor
 final class LoadoutMenuModel {
     private(set) var context: MenuContext?
     private(set) var loginEnabled = LoginItemController.isEnabled
+    private(set) var shellHookInstalled = ShellHookInstaller().isInstalled()
     var manageSelection: String?
     private(set) var exportPreview = ""
     private(set) var collisionOrder: [String] = []
     private(set) var isRefreshing = false
     var preferredWindowTab: LoadoutWindowTab = .services
+    var alert: LoadoutAlert?
 
     private let stateStore = StateStore()
     private let keychain = KeychainStore()
@@ -35,6 +43,8 @@ final class LoadoutMenuModel {
     private var catalog: KeychainCatalog?
     private var variableNamesByKey: [String: [String]] = [:]
     private var refreshGeneration: UInt = 0
+    private var mutationGeneration: UInt = 0
+    private let mutationQueue = DispatchQueue(label: "app.loadout.menu-model.mutations")
     @ObservationIgnored nonisolated(unsafe) private var refreshObserver: NSObjectProtocol?
 
     init() {
@@ -60,9 +70,35 @@ final class LoadoutMenuModel {
         context?.summary.hasProdSelected ?? false
     }
 
+    /// First active service whose selected variant is sensitive (e.g. prod),
+    /// used to name the service in warning banners.
+    var sensitiveActiveService: String? {
+        guard context != nil else { return nil }
+        return activeMenuEntries()
+            .first { LoadoutVariantStyle.isSensitive($0.variant) }?
+            .service
+    }
+
+    /// Builds the current export and copies it to the pasteboard. Returns the
+    /// number of lines copied (0 if nothing is selected).
+    @discardableResult
+    func copyExport() async -> Int {
+        guard let catalog else { return 0 }
+        let preview = await Task.detached(priority: .userInitiated) {
+            Self.buildExportPreview(catalog: catalog, exportEngine: ExportEngine())
+        }.value
+        exportPreview = preview
+        let payload = preview.isEmpty ? "" : preview
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(payload, forType: .string)
+        return payload.isEmpty ? 0 : payload.split(separator: "\n").count
+    }
+
     var stateFilePath: String { LoadoutPaths.stateFileURL.path }
     var keychainPath: String { LoadoutKeychain.path }
     var cliPath: String { CLIInstaller.installURL.path }
+    var shellHookPath: String { ShellHookInstaller.zshrcURL.path }
+    var restartLoadingReady: Bool { loginEnabled && shellHookInstalled }
 
     func refresh(includeExportPreview: Bool = false, force: Bool = false) {
         if isRefreshing, !force, !includeExportPreview {
@@ -117,87 +153,136 @@ final class LoadoutMenuModel {
         variableNamesByKey[Self.variantKey(service: service, variant: variant)] ?? []
     }
 
-    func variableValue(service: String, variant: String, name: String) throws -> String? {
-        try keychain.get(service: service, variant: variant, variable: name)
+    func variableValue(service: String, variant: String, name: String) async throws -> String? {
+        let keychain = KeychainStore()
+        return try await Task.detached(priority: .userInitiated) {
+            try keychain.get(service: service, variant: variant, variable: name)
+        }.value
     }
 
     func select(service: String, variant: String) {
-        apply(keychainMutation: false, includeExportPreview: false) {
-            _ = try stateStore.select(service: service, variant: variant)
+        mutate(keychainMutation: false, includeExportPreview: false) {
+            let store = StateStore()
+            _ = try store.select(service: service, variant: variant)
         }
     }
 
     func deselect(service: String) {
-        apply(keychainMutation: false, includeExportPreview: false) {
-            _ = try stateStore.deselect(service: service)
+        mutate(keychainMutation: false, includeExportPreview: false) {
+            let store = StateStore()
+            _ = try store.deselect(service: service)
         }
     }
 
     func setVariable(service: String, variant: String, name: String, value: String) {
-        apply(keychainMutation: true, includeExportPreview: false) {
-            try keychain.set(service: service, variant: variant, variable: name, value: value)
+        mutate(keychainMutation: true, includeExportPreview: false) {
+            let store = KeychainStore()
+            try store.set(service: service, variant: variant, variable: name, value: value)
         }
     }
 
     func deleteVariable(service: String, variant: String, name: String) {
-        apply(keychainMutation: true, includeExportPreview: false) {
-            try keychain.deleteVariable(service: service, variant: variant, variable: name)
+        mutate(keychainMutation: true, includeExportPreview: false) {
+            let store = KeychainStore()
+            try store.deleteVariable(service: service, variant: variant, variable: name)
         }
     }
 
     func deleteVariant(service: String, variant: String) {
-        apply(keychainMutation: true, includeExportPreview: false) {
-            let count = try keychain.deleteVariant(service: service, variant: variant)
+        mutate(keychainMutation: true, includeExportPreview: false) {
+            let kc = KeychainStore()
+            let store = StateStore()
+            let count = try kc.deleteVariant(service: service, variant: variant)
             guard count >= 0 else { return }
-            let state = try stateStore.load()
+            let state = try store.load()
             if state.selection[service] == variant {
-                _ = try stateStore.deselect(service: service)
+                _ = try store.deselect(service: service)
             }
         }
     }
 
     func deleteService(_ service: String) {
-        apply(keychainMutation: true, includeExportPreview: false) {
-            _ = try keychain.deleteService(service)
-            _ = try stateStore.removeServiceReferences(service)
+        mutate(keychainMutation: true, includeExportPreview: false) {
+            let kc = KeychainStore()
+            let store = StateStore()
+            _ = try kc.deleteService(service)
+            _ = try store.removeServiceReferences(service)
         }
     }
 
     func moveOrder(from source: IndexSet, to destination: Int) {
         var order = collisionOrder
         order.move(fromOffsets: source, toOffset: destination)
-        apply(keychainMutation: false, includeExportPreview: true) {
-            _ = try stateStore.setOrder(order)
-        }
+        applyOrder(order)
     }
 
     func moveServiceUp(at index: Int) {
         guard index > 0 else { return }
         var order = collisionOrder
         order.swapAt(index, index - 1)
-        apply(keychainMutation: false, includeExportPreview: true) {
-            _ = try stateStore.setOrder(order)
-        }
+        applyOrder(order)
     }
 
     func moveServiceDown(at index: Int) {
         guard index < collisionOrder.count - 1 else { return }
         var order = collisionOrder
         order.swapAt(index, index + 1)
-        apply(keychainMutation: false, includeExportPreview: true) {
-            _ = try stateStore.setOrder(order)
+        applyOrder(order)
+    }
+
+    private func applyOrder(_ order: [String]) {
+        mutate(keychainMutation: false, includeExportPreview: true) {
+            let store = StateStore()
+            _ = try store.setOrder(order)
         }
     }
 
     func toggleLogin() {
-        do {
-            try LoginItemController.setEnabled(!LoginItemController.isEnabled)
-            loginEnabled = LoginItemController.isEnabled
-        } catch {
-            showAlert(
-                title: "Launch at login",
-                message: "Could not update login item: \(error.localizedDescription)\n\nStatus: \(LoginItemController.statusDescription)"
-            )
+        Task { @MainActor in
+            do {
+                try LoginItemController.setEnabled(!LoginItemController.isEnabled)
+                loginEnabled = LoginItemController.isEnabled
+            } catch {
+                presentAlert(
+                    title: "Launch at login",
+                    message: "Could not update login item: \(error.localizedDescription)\n\nStatus: \(LoginItemController.statusDescription)"
+                )
+            }
+        }
+    }
+
+    func setUpRestartLoading() {
+        Task { @MainActor in
+            do {
+                _ = try CLIInstaller().installBundledCLIIfNeeded()
+                _ = try ShellHookInstaller().installOrUpdate()
+                shellHookInstalled = ShellHookInstaller().isInstalled()
+                try LoginItemController.setEnabled(true)
+                loginEnabled = LoginItemController.isEnabled
+                presentAlert(
+                    title: "Restart loading is ready",
+                    message: "Loadout will open at login. New terminal windows will apply the current Active set automatically from your shell hook."
+                )
+            } catch {
+                shellHookInstalled = ShellHookInstaller().isInstalled()
+                loginEnabled = LoginItemController.isEnabled
+                presentAlert(
+                    title: "Restart loading setup failed",
+                    message: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    func installShellHook() {
+        Task { @MainActor in
+            do {
+                _ = try CLIInstaller().installBundledCLIIfNeeded()
+                _ = try ShellHookInstaller().installOrUpdate()
+                shellHookInstalled = ShellHookInstaller().isInstalled()
+            } catch {
+                presentAlert(title: "Shell hook", message: error.localizedDescription)
+            }
         }
     }
 
@@ -205,36 +290,6 @@ final class LoadoutMenuModel {
         NSWorkspace.shared.selectFile(
             stateFilePath,
             inFileViewerRootedAtPath: LoadoutPaths.configDirectory.path
-        )
-    }
-
-    func showReloadHint() {
-        showAlert(
-            title: "Reload open terminals",
-            message: """
-            Loadout cannot update already-open terminals automatically.
-
-            In each open terminal, run:
-
-                reloadenv
-
-            New terminals load the active set from your .zshrc hook.
-            """
-        )
-    }
-
-    func showImportHint() {
-        let zshrc = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".zshrc").path
-        showAlert(
-            title: "Import secrets",
-            message: """
-            Import from your shell config:
-
-                loadout import --from \(zshrc)
-
-            Or add variables from Manage → Add variable.
-            """
         )
     }
 
@@ -268,10 +323,11 @@ final class LoadoutMenuModel {
             collisionOrder = order
             sanitizeManageSelection(registry: registry)
             if includeExportPreview {
-                exportPreview = Self.buildExportPreview(
-                    catalog: loadedCatalog,
-                    exportEngine: exportEngine
-                )
+                let preview = await Task.detached(priority: .userInitiated) {
+                    Self.buildExportPreview(catalog: loadedCatalog, exportEngine: ExportEngine())
+                }.value
+                guard generation == refreshGeneration else { return }
+                exportPreview = preview
             }
         } catch {
             guard generation == refreshGeneration else { return }
@@ -293,26 +349,46 @@ final class LoadoutMenuModel {
         }
         guard generation == refreshGeneration else { return }
         loginEnabled = LoginItemController.isEnabled
+        shellHookInstalled = ShellHookInstaller().isInstalled()
     }
 
-    private func apply(
+    private func mutate(
         keychainMutation: Bool,
         includeExportPreview: Bool,
-        _ change: () throws -> Void
+        _ change: @escaping @Sendable () throws -> Void
     ) {
-        do {
-            try change()
-            if keychainMutation {
-                refresh(includeExportPreview: includeExportPreview)
-            } else {
-                updateContextFromState(includeExportPreview: includeExportPreview)
+        mutationGeneration &+= 1
+        let generation = mutationGeneration
+        Task { @MainActor in
+            do {
+                try await runSerializedMutation(change)
+                guard generation == mutationGeneration else { return }
+                if keychainMutation {
+                    refresh(includeExportPreview: includeExportPreview)
+                } else {
+                    await updateContextFromState(includeExportPreview: includeExportPreview)
+                }
+            } catch {
+                guard generation == mutationGeneration else { return }
+                presentAlert(title: "Loadout", message: error.localizedDescription)
             }
-        } catch {
-            showAlert(title: "Loadout", message: error.localizedDescription)
         }
     }
 
-    private func updateContextFromState(includeExportPreview: Bool) {
+    private func runSerializedMutation(_ change: @escaping @Sendable () throws -> Void) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            mutationQueue.async {
+                do {
+                    try change()
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func updateContextFromState(includeExportPreview: Bool) async {
         guard let registry = context?.registry else {
             refresh(includeExportPreview: includeExportPreview)
             return
@@ -328,10 +404,13 @@ final class LoadoutMenuModel {
             )
             collisionOrder = orderedServices(state: state, registry: registry)
             if includeExportPreview, let catalog {
-                exportPreview = Self.buildExportPreview(catalog: catalog, exportEngine: exportEngine)
+                let preview = await Task.detached(priority: .userInitiated) {
+                    Self.buildExportPreview(catalog: catalog, exportEngine: ExportEngine())
+                }.value
+                exportPreview = preview
             }
         } catch {
-            showAlert(title: "Loadout", message: error.localizedDescription)
+            presentAlert(title: "Loadout", message: error.localizedDescription)
         }
     }
 
@@ -370,7 +449,7 @@ final class LoadoutMenuModel {
         return index
     }
 
-    private static func buildExportPreview(
+    private nonisolated static func buildExportPreview(
         catalog: KeychainCatalog,
         exportEngine: ExportEngine
     ) -> String {
@@ -384,11 +463,21 @@ final class LoadoutMenuModel {
         return lines.joined(separator: "\n")
     }
 
-    private func showAlert(title: String, message: String) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.alertStyle = .informational
-        alert.runModal()
+    private func presentAlert(title: String, message: String) {
+        alert = LoadoutAlert(title: title, message: message)
+        guard !isLoadoutWindowVisible else {
+            return
+        }
+        let nsAlert = NSAlert()
+        nsAlert.messageText = title
+        nsAlert.informativeText = message
+        nsAlert.alertStyle = .warning
+        nsAlert.runModal()
+    }
+
+    private var isLoadoutWindowVisible: Bool {
+        NSApp.windows.contains { window in
+            window.isVisible && window.title == LoadoutAppInfo.name
+        }
     }
 }

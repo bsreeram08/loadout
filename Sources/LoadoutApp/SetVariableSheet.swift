@@ -75,19 +75,7 @@ struct SetVariableSheet: View {
         }
         .frame(width: 400, height: 260)
         .task(id: taskID) {
-            guard case .edit(let name) = mode else { return }
-            variableName = name
-            loadError = nil
-            do {
-                try await KeychainAuthenticator.authenticateForSecretAccess()
-                if let value = try model.variableValue(service: service, variant: variant, name: name) {
-                    variableValue = value
-                }
-            } catch {
-                if !KeychainAuthenticator.isUserCancellation(error) {
-                    loadError = error.localizedDescription
-                }
-            }
+            await loadExistingValue()
         }
     }
 
@@ -100,5 +88,23 @@ struct SetVariableSheet: View {
             return !variableValue.isEmpty
         }
         return !variableName.isEmpty && !variableValue.isEmpty
+    }
+
+    private func loadExistingValue() async {
+        guard case .edit(let name) = mode else { return }
+        variableName = name
+        loadError = nil
+        do {
+            try await KeychainAuthenticator.authenticateForSecretAccess()
+            if let value = try await model.variableValue(service: service, variant: variant, name: name) {
+                variableValue = value
+            }
+        } catch {
+            if KeychainAuthenticator.isUserCancellation(error) {
+                loadError = "Authentication cancelled. Retry loading the current value, or enter a new secret value to overwrite it."
+            } else {
+                loadError = error.localizedDescription
+            }
+        }
     }
 }

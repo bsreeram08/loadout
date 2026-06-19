@@ -1,7 +1,7 @@
 import XCTest
 @testable import LoadoutCore
 
-/// Verifies dump-keychain parsing used by KeychainCatalog for dedicated keychain files.
+/// Verifies KeychainCatalog enumerates dedicated keychain items without reading secret data.
 final class KeychainCatalogDumpTests: XCTestCase {
     private var harness: KeychainTestHarness!
 

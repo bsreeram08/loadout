@@ -33,6 +33,16 @@ final class StateStoreTests: XCTestCase {
         XCTAssertNil(state.selection["postgres"])
     }
 
+    func testSelectReplacesVariantWithoutDuplicatingOrder() throws {
+        let store = store()
+        _ = try store.select(service: "bambora", variant: "test")
+        _ = try store.select(service: "bambora", variant: "prod")
+
+        let state = try store.load()
+        XCTAssertEqual(state.selection["bambora"], "prod")
+        XCTAssertEqual(state.order.filter { $0 == "bambora" }, ["bambora"])
+    }
+
     func testSetOrderPreservesSelection() throws {
         let store = store()
         _ = try store.select(service: "b", variant: "prod")

@@ -26,24 +26,3 @@ enum LoadoutWindowTab: String, CaseIterable, Identifiable {
         }
     }
 }
-
-enum SettingsSection: String, CaseIterable, Identifiable {
-    case general
-    case storage
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .general: return "General"
-        case .storage: return "Storage"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .general: return "gearshape"
-        case .storage: return "externaldrive"
-        }
-    }
-}

@@ -3,43 +3,49 @@ import Foundation
 
 enum KeychainAccess {
     static func unlockLoginKeychain() throws {
-        let keychain = loginKeychainPath
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        process.arguments = ["unlock-keychain", "-u", keychain]
-        process.standardInput = FileHandle.standardInput
-        process.standardOutput = FileHandle.standardOutput
-        process.standardError = FileHandle.standardError
+        try LoadoutKeychain.performBlocking {
+            let keychain = loginKeychainPath
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+            process.arguments = ["unlock-keychain", "-u", keychain]
+            process.standardInput = FileHandle.standardInput
+            process.standardOutput = FileHandle.standardOutput
+            process.standardError = FileHandle.standardError
 
-        try process.run()
-        process.waitUntilExit()
+            try process.run()
+            process.waitUntilExit()
 
-        guard process.terminationStatus == 0 else {
-            throw LoadoutError.io("failed to unlock login keychain (exit \(process.terminationStatus))")
+            guard process.terminationStatus == 0 else {
+                throw LoadoutError.io("failed to unlock login keychain (exit \(process.terminationStatus))")
+            }
         }
     }
 
     static func currentCDHash() throws -> String {
-        let path = executablePath
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
-        process.arguments = ["-dv", "--verbose=4", path]
+        try LoadoutKeychain.performBlocking {
+            let path = executablePath
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+            process.arguments = ["-dv", "--verbose=4", path]
 
-        let output = Pipe()
-        process.standardError = output
-        process.standardOutput = FileHandle.nullDevice
+            let output = Pipe()
+            process.standardError = output
+            process.standardOutput = FileHandle.nullDevice
 
-        try process.run()
-        process.waitUntilExit()
+            try process.run()
+            let text = String(
+                data: output.fileHandleForReading.readDataToEndOfFile(),
+                encoding: .utf8
+            ) ?? ""
+            process.waitUntilExit()
+            if let cdhash = parseCDHash(from: text) {
+                return cdhash
+            }
 
-        let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        if let cdhash = parseCDHash(from: text) {
-            return cdhash
+            throw LoadoutError.io(
+                "could not read CDHash for \(path) — run ./scripts/install.sh to ad-hoc sign loadout"
+            )
         }
-
-        throw LoadoutError.io(
-            "could not read CDHash for \(path) — run ./scripts/install.sh to ad-hoc sign loadout"
-        )
     }
 
     static func parseCDHash(from codesignOutput: String) -> String? {

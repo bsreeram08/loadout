@@ -3,8 +3,12 @@ import SwiftUI
 
 enum LoadoutChrome {
     static let contentPadding: CGFloat = 16
+    static let cardSpacing: CGFloat = 12
     static let placeholderMarkSize: CGFloat = 56
     static let headerMarkSize: CGFloat = 22
+    static let sidebarMinWidth: CGFloat = 160
+    static let sidebarIdealWidth: CGFloat = 180
+    static let sidebarMaxWidth: CGFloat = 220
 }
 
 struct LoadoutMark: View {
@@ -73,6 +77,129 @@ struct LoadoutWindowHeader: View {
     }
 }
 
+struct LoadoutTabActions {
+    var addTitle: String?
+    var onAdd: (() -> Void)?
+    var onRefresh: (() -> Void)?
+}
+
+struct LoadoutTabHeader: View {
+    let title: String
+    var subtitle: String?
+    var actions: LoadoutTabActions?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            if let actions {
+                HStack(spacing: 8) {
+                    if let onRefresh = actions.onRefresh {
+                        Button(action: onRefresh) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .help("Refresh")
+                    }
+                    if let addTitle = actions.addTitle, let onAdd = actions.onAdd {
+                        Button(action: onAdd) {
+                            Label(addTitle, systemImage: "plus")
+                        }
+                    }
+                }
+                .buttonStyle(.borderless)
+                .labelStyle(.titleAndIcon)
+            }
+        }
+        .padding(.horizontal, LoadoutChrome.contentPadding)
+        .padding(.vertical, 12)
+    }
+}
+
+struct LoadoutTabContent<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(LoadoutChrome.contentPadding)
+    }
+}
+
+struct LoadoutGroupedForm<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LoadoutChrome.cardSpacing, content: content)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+struct LoadoutTabLayout<Sidebar: View, Detail: View>: View {
+    @ViewBuilder let sidebar: () -> Sidebar
+    @ViewBuilder let detail: () -> Detail
+
+    var body: some View {
+        HStack(alignment: .top, spacing: LoadoutChrome.cardSpacing) {
+            LoadoutCard(padding: 8) {
+                sidebar()
+            }
+            .frame(
+                minWidth: LoadoutChrome.sidebarMinWidth,
+                idealWidth: LoadoutChrome.sidebarIdealWidth,
+                maxWidth: LoadoutChrome.sidebarMaxWidth,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
+
+            detail()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(LoadoutChrome.contentPadding)
+    }
+}
+
+/// Full-width tab: header, divider, then either split or single content.
+struct LoadoutTabShell<Content: View>: View {
+    let title: String
+    var subtitle: String?
+    var actions: LoadoutTabActions?
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            LoadoutTabHeader(title: title, subtitle: subtitle, actions: actions)
+            Divider()
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(Color(nsColor: .windowBackgroundColor))
+        }
+    }
+}
+
+struct LoadoutSplitTabShell<Sidebar: View, Detail: View>: View {
+    let title: String
+    var subtitle: String?
+    var actions: LoadoutTabActions?
+    @ViewBuilder let sidebar: () -> Sidebar
+    @ViewBuilder let detail: () -> Detail
+
+    var body: some View {
+        LoadoutTabShell(title: title, subtitle: subtitle, actions: actions) {
+            LoadoutTabLayout(sidebar: sidebar, detail: detail)
+        }
+    }
+}
+
 struct LoadoutPlaceholderState: View {
     let title: String
     let message: String
@@ -103,18 +230,105 @@ struct LoadoutPlaceholderState: View {
     }
 }
 
-struct LoadoutPanelScaffold<Header: View, Content: View>: View {
-    @ViewBuilder let header: () -> Header
+struct LoadoutCard<Content: View>: View {
+    var padding: CGFloat = 14
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header()
-            content()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .glassSurface(cornerRadius: 12)
+    }
+}
+
+struct LoadoutCardSection<Content: View>: View {
+    let title: String
+    var subtitle: String?
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        LoadoutCard {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(LoadoutChrome.contentPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct LoadoutRow<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10, content: content)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct LoadoutActionRow: View {
+    let title: String
+    let subtitle: String?
+    let systemImage: String
+    var isDisabled = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.semibold))
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.body.weight(.medium))
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: isDisabled ? "checkmark.circle.fill" : "chevron.right")
+                    .foregroundStyle(isDisabled ? .green : .secondary)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(isDisabled ? 0.14 : 0.28), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.72 : 1)
+    }
+}
+
+struct LoadoutCodePanel<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .glassSurface(cornerRadius: 10)
     }
 }
 

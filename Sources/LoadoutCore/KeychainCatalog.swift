@@ -74,25 +74,16 @@ public struct KeychainCatalog: Sendable {
         }
 
         try LoadoutKeychain.ensureReady()
-        // SecItemCopyMatching ignores the user search list; dump the dedicated file directly.
+        // SecItemCopyMatching does not scope to a single keychain file; dump attributes
+        // from the dedicated file directly (never use dump-keychain -d — that reads secrets).
         let dedicated = try loadItemsFromKeychainFile(LoadoutKeychain.path)
         let login = try queryLoadoutItems()
         return mergeItems(dedicated: dedicated, login: login)
     }
 
     private static func loadItemsFromKeychainFile(_ path: String) throws -> [Item] {
-        let output = Pipe()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        process.arguments = ["dump-keychain", "-d", path]
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            return []
-        }
-        let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let text = try LoadoutKeychain.dumpKeychainAttributes(path)
+        guard !text.isEmpty else { return [] }
         return parseDumpKeychain(text)
     }
 
@@ -145,6 +136,7 @@ public struct KeychainCatalog: Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecReturnAttributes as String: true,
+            kSecReturnData as String: false,
             kSecMatchLimit as String: kSecMatchLimitAll,
             kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
         ]

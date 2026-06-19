@@ -2,7 +2,7 @@
 
 Local-first macOS tool for **per-service environment profiles**. Toggle each service's variant independently (e.g. Worldline → prod, Bambora → test), keep secrets encrypted in the macOS Keychain, and load the active set into new terminal sessions.
 
-**Current version:** `0.2.0.3`
+**Current version:** `0.3.0.0`
 
 ```
 Menu bar (compact)          Main window (full catalog)
@@ -30,7 +30,7 @@ If your `~/.zshrc` is a wall of commented/uncommented `export` blocks across dev
 - **Import wizard** — one-time migration from `~/.zshrc`
 - **Manage UI** — CRUD for services, variants, and variables
 - **Opt-in export** — nothing exports until you explicitly select a service
-- **67 tests** — unit, integration, and CLI subprocess coverage against real temp keychains
+- **74 tests** — unit, integration, and CLI subprocess coverage against real temp keychains
 
 ## Requirements
 
@@ -80,18 +80,25 @@ open /Applications/Loadout.app
 SIGN_IDENTITY="Developer ID Application: …" NOTARIZE=1 ./scripts/package-release.sh
 ```
 
-### Shell hook
+### Load after restart
 
-Add once to `~/.zshrc` (see `scripts/zshrc-hook.snippet`):
+In the app, open **Settings → Load after restart → Set up restart loading**.
+That installs or updates the managed shell hook, ensures the bundled CLI is in
+`~/.local/bin/loadout`, and enables the login item so Loadout opens after reboot.
+
+New terminals then pick up the current selection automatically. Already-open
+terminals keep their old environment; run `reloadenv` inside that shell to
+re-apply Loadout.
+
+Manual fallback: add the managed block to `~/.zshrc` (see
+`scripts/zshrc-hook.snippet`):
 
 ```zsh
-if command -v loadout >/dev/null 2>&1; then
-  eval "$(loadout export 2>/dev/null)"
-  reloadenv() { eval "$(loadout export 2>/dev/null)"; }
+if [ -x "$HOME/.local/bin/loadout" ]; then
+  eval "$("$HOME/.local/bin/loadout" export 2>/dev/null)"
+  reloadenv() { eval "$("$HOME/.local/bin/loadout" export 2>/dev/null)"; }
 fi
 ```
-
-New terminals pick up the current selection. Already-open terminals need `reloadenv`.
 
 ## Quick start
 
@@ -118,7 +125,7 @@ loadout status
 Click the menu-bar icon for a short status menu:
 
 - **Manage services…** — open the main window (full service list, CRUD)
-- **Settings…** — general preferences and storage paths
+- **Settings…** — startup setup, collision Order, and storage paths
 - **Active services only** — quick variant toggle for what's exporting
 - Summary line when nothing is active, e.g. `52 services stored, none active`
 
@@ -153,7 +160,7 @@ Use **Manage services…** to turn services on/off when you have many stored pro
 ## Development
 
 ```bash
-swift test                    # 67 tests (unit + integration + CLI)
+swift test                    # 74 tests (unit + integration + CLI)
 swift build                   # CLI only
 ./scripts/build-app.sh        # Loadout.app → dist/
 BUILD_CONFIG=debug ./scripts/install.sh

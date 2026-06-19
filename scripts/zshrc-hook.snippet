@@ -1,5 +1,6 @@
-# Loadout — load active env profile (idempotent; safe to append once)
-if command -v loadout >/dev/null 2>&1; then
-  eval "$(loadout export 2>/dev/null)"
-  reloadenv() { eval "$(loadout export 2>/dev/null)"; }
+# >>> loadout shell hook >>>
+if [ -x "$HOME/.local/bin/loadout" ]; then
+  eval "$("$HOME/.local/bin/loadout" export 2>/dev/null)"
+  reloadenv() { eval "$("$HOME/.local/bin/loadout" export 2>/dev/null)"; }
 fi
+# <<< loadout shell hook <<<

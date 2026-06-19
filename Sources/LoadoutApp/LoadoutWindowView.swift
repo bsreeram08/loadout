@@ -26,6 +26,13 @@ struct LoadoutWindowView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 640, minHeight: 480)
+        .alert(item: $model.alert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
         .onAppear {
             tab = model.preferredWindowTab
             refreshForTab(tab)
