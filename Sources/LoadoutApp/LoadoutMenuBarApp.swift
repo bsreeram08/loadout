@@ -12,7 +12,7 @@ struct LoadoutMenuBarApp: App {
         } label: {
             MenuBarIconLabel(showsProdWarning: model.hasProdSelected)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
 
         Window("Loadout", id: "loadout") {
             LoadoutWindowView(model: model)

@@ -70,6 +70,30 @@ final class LoadoutMenuModel {
         context?.summary.hasProdSelected ?? false
     }
 
+    /// First active service whose selected variant is sensitive (e.g. prod),
+    /// used to name the service in warning banners.
+    var sensitiveActiveService: String? {
+        guard context != nil else { return nil }
+        return activeMenuEntries()
+            .first { LoadoutVariantStyle.isSensitive($0.variant) }?
+            .service
+    }
+
+    /// Builds the current export and copies it to the pasteboard. Returns the
+    /// number of lines copied (0 if nothing is selected).
+    @discardableResult
+    func copyExport() async -> Int {
+        guard let catalog else { return 0 }
+        let preview = await Task.detached(priority: .userInitiated) {
+            Self.buildExportPreview(catalog: catalog, exportEngine: ExportEngine())
+        }.value
+        exportPreview = preview
+        let payload = preview.isEmpty ? "" : preview
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(payload, forType: .string)
+        return payload.isEmpty ? 0 : payload.split(separator: "\n").count
+    }
+
     var stateFilePath: String { LoadoutPaths.stateFileURL.path }
     var keychainPath: String { LoadoutKeychain.path }
     var cliPath: String { CLIInstaller.installURL.path }
