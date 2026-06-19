@@ -184,6 +184,43 @@ public enum LoadoutKeychain {
         }
     }
 
+    static func accounts(keychain: String, service: String) throws -> [String] {
+        try withExclusiveSearchList(keychain) {
+            try accountsOnBlockingQueue(service: service)
+        }
+    }
+
+    private static func accountsOnBlockingQueue(service: String) throws -> [String] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnAttributes as String: true,
+            kSecReturnData as String: false,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
+        ]
+
+        var items: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &items)
+        if status == errSecItemNotFound {
+            return []
+        }
+        guard status == errSecSuccess else {
+            throw LoadoutError.keychain(status)
+        }
+
+        let rows: [[String: Any]]
+        if let one = items as? [String: Any] {
+            rows = [one]
+        } else if let many = items as? [[String: Any]] {
+            rows = many
+        } else {
+            return []
+        }
+
+        return rows.compactMap { $0[kSecAttrAccount as String] as? String }.sorted()
+    }
+
     private static func readSecretOnBlockingQueue(
         keychain: String,
         service: String,

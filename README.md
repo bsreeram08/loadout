@@ -30,7 +30,7 @@ If your `~/.zshrc` is a wall of commented/uncommented `export` blocks across dev
 - **Import wizard** — one-time migration from `~/.zshrc`
 - **Manage UI** — CRUD for services, variants, and variables
 - **Opt-in export** — nothing exports until you explicitly select a service
-- **73 tests** — unit, integration, and CLI subprocess coverage against real temp keychains
+- **74 tests** — unit, integration, and CLI subprocess coverage against real temp keychains
 
 ## Requirements
 
@@ -160,7 +160,7 @@ Use **Manage services…** to turn services on/off when you have many stored pro
 ## Development
 
 ```bash
-swift test                    # 73 tests (unit + integration + CLI)
+swift test                    # 74 tests (unit + integration + CLI)
 swift build                   # CLI only
 ./scripts/build-app.sh        # Loadout.app → dist/
 BUILD_CONFIG=debug ./scripts/install.sh

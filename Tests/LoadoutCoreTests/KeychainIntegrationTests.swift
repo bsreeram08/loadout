@@ -66,6 +66,26 @@ final class KeychainIntegrationTests: XCTestCase {
         _ = try stateStore.removeServiceReferences(service)
     }
 
+    func testExportEngineReadsSelectedPairWithoutCatalog() throws {
+        let store = KeychainStore()
+        let stateStore = StateStore()
+        let selected = harness.uniqueService("sel")
+        let unselected = harness.uniqueService("off")
+        try store.set(service: selected, variant: "prod", variable: "SELECTED_KEY", value: "selected")
+        try store.set(service: unselected, variant: "prod", variable: "UNSELECTED_KEY", value: "unselected")
+        _ = try stateStore.select(service: selected, variant: "prod")
+
+        let result = try ExportEngine(stateStore: stateStore, keychain: store).export()
+
+        XCTAssertEqual(result.lines, [ShellQuoting.exportLine(key: "SELECTED_KEY", value: "selected")])
+        XCTAssertTrue(result.warnings.isEmpty)
+
+        _ = try store.deleteService(selected)
+        _ = try store.deleteService(unselected)
+        _ = try stateStore.removeServiceReferences(selected)
+        _ = try stateStore.removeServiceReferences(unselected)
+    }
+
     func testImportStoresReadableValues() throws {
         let importer = ZshrcImporter()
         let store = KeychainStore()

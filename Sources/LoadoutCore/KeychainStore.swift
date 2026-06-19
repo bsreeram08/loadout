@@ -35,11 +35,12 @@ public struct KeychainStore: Sendable {
     @discardableResult
     public func deleteService(_ service: String) throws -> Int {
         try NameValidator.validateService(service)
-        let entry = try registry(catalog: nil).first { $0.service == service }
+        let catalog = try KeychainCatalog()
+        let entry = try registry(catalog: catalog).first { $0.service == service }
         guard let entry else { return 0 }
         var deleted = 0
         for variant in entry.variants {
-            deleted += try deleteVariant(service: service, variant: variant)
+            deleted += try deleteVariant(service: service, variant: variant, catalog: catalog)
         }
         return deleted
     }
@@ -83,7 +84,16 @@ public struct KeychainStore: Sendable {
         if let catalog {
             return catalog.variableNames(service: service, variant: variant)
         }
-        return try KeychainCatalog().variableNames(service: service, variant: variant)
+        try NameValidator.validateService(service)
+        try NameValidator.validateVariant(variant)
+        let serviceAttr = LoadoutPaths.keychainService(service: service, variant: variant)
+        if ProcessInfo.processInfo.environment["LOADOUT_SKIP_PARTITION"] == "1" {
+            return try variableNamesViaSecItem(serviceAttr: serviceAttr)
+        }
+        try LoadoutKeychain.ensureReady()
+        let dedicated = try LoadoutKeychain.accounts(keychain: LoadoutKeychain.path, service: serviceAttr)
+        let login = try LoadoutKeychain.accounts(keychain: LoadoutKeychain.loginPath, service: serviceAttr)
+        return Array(Set(dedicated).union(login)).sorted()
     }
 
     public func registry(catalog: KeychainCatalog? = nil) throws -> [RegistryEntry] {
@@ -91,6 +101,15 @@ public struct KeychainStore: Sendable {
             return catalog.registry()
         }
         return try KeychainCatalog().registry()
+    }
+
+    private func deleteVariant(service: String, variant: String, catalog: KeychainCatalog) throws -> Int {
+        let names = try variableNames(service: service, variant: variant, catalog: catalog)
+        let serviceAttr = LoadoutPaths.keychainService(service: service, variant: variant)
+        for name in names {
+            try LoadoutKeychain.delete(service: serviceAttr, account: name)
+        }
+        return names.count
     }
 
     public func accessPolicyDescription() throws -> String {
@@ -190,6 +209,37 @@ public struct KeychainStore: Sendable {
             throw LoadoutError.keychain(status)
         }
         return value
+    }
+
+    private func variableNamesViaSecItem(serviceAttr: String) throws -> [String] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceAttr,
+            kSecReturnAttributes as String: true,
+            kSecReturnData as String: false,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
+        ]
+
+        var items: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &items)
+        if status == errSecItemNotFound {
+            return []
+        }
+        guard status == errSecSuccess else {
+            throw LoadoutError.keychain(status)
+        }
+
+        let rows: [[String: Any]]
+        if let one = items as? [String: Any] {
+            rows = [one]
+        } else if let many = items as? [[String: Any]] {
+            rows = many
+        } else {
+            return []
+        }
+
+        return rows.compactMap { $0[kSecAttrAccount as String] as? String }.sorted()
     }
 
     private struct LoadoutItem {
