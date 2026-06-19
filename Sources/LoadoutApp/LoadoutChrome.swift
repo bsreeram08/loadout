@@ -278,6 +278,47 @@ struct LoadoutRow<Content: View>: View {
     }
 }
 
+struct LoadoutActionRow: View {
+    let title: String
+    let subtitle: String?
+    let systemImage: String
+    var isDisabled = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.semibold))
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.body.weight(.medium))
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: isDisabled ? "checkmark.circle.fill" : "chevron.right")
+                    .foregroundStyle(isDisabled ? .green : .secondary)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(isDisabled ? 0.14 : 0.28), in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.72 : 1)
+    }
+}
+
 struct LoadoutCodePanel<Content: View>: View {
     @ViewBuilder let content: () -> Content
 

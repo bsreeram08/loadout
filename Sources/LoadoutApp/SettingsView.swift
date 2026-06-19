@@ -40,17 +40,24 @@ struct SettingsTabView: View {
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
 
-                        HStack {
-                            Button(model.restartLoadingReady ? "Restart loading ready" : "Set up restart loading") {
-                                model.setUpRestartLoading()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(model.restartLoadingReady)
+                        LoadoutActionRow(
+                            title: model.restartLoadingReady ? "Restart loading ready" : "Set up restart loading",
+                            subtitle: model.restartLoadingReady
+                                ? "Login item and shell hook are already configured."
+                                : "Install the CLI, add the managed shell hook, and enable the login item.",
+                            systemImage: model.restartLoadingReady ? "checkmark.circle.fill" : "power",
+                            isDisabled: model.restartLoadingReady
+                        ) {
+                            model.setUpRestartLoading()
+                        }
 
-                            if !model.shellHookInstalled {
-                                Button("Install shell hook only") {
-                                    model.installShellHook()
-                                }
+                        if !model.shellHookInstalled {
+                            LoadoutActionRow(
+                                title: "Install shell hook only",
+                                subtitle: "Add the managed .zshrc block without changing the login item.",
+                                systemImage: "terminal"
+                            ) {
+                                model.installShellHook()
                             }
                         }
                     }
@@ -98,7 +105,11 @@ struct SettingsTabView: View {
                     }
 
                         LoadoutCardSection(title: "Actions") {
-                            Button("Reveal config folder") {
+                            LoadoutActionRow(
+                                title: "Reveal config folder",
+                                subtitle: "Open the folder containing Loadout state and support files.",
+                                systemImage: "folder"
+                            ) {
                                 model.openConfigFolder()
                             }
                         }
