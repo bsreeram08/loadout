@@ -44,6 +44,7 @@ final class LoadoutMenuModel {
     private var variableNamesByKey: [String: [String]] = [:]
     private var refreshGeneration: UInt = 0
     private var mutationGeneration: UInt = 0
+    private let mutationQueue = DispatchQueue(label: "app.loadout.menu-model.mutations")
     @ObservationIgnored nonisolated(unsafe) private var refreshObserver: NSObjectProtocol?
 
     init() {
@@ -336,9 +337,7 @@ final class LoadoutMenuModel {
         let generation = mutationGeneration
         Task { @MainActor in
             do {
-                try await Task.detached(priority: .userInitiated) {
-                    try change()
-                }.value
+                try await runSerializedMutation(change)
                 guard generation == mutationGeneration else { return }
                 if keychainMutation {
                     refresh(includeExportPreview: includeExportPreview)
@@ -348,6 +347,19 @@ final class LoadoutMenuModel {
             } catch {
                 guard generation == mutationGeneration else { return }
                 presentAlert(title: "Loadout", message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func runSerializedMutation(_ change: @escaping @Sendable () throws -> Void) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            mutationQueue.async {
+                do {
+                    try change()
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
         }
     }
@@ -429,5 +441,19 @@ final class LoadoutMenuModel {
 
     private func presentAlert(title: String, message: String) {
         alert = LoadoutAlert(title: title, message: message)
+        guard !isLoadoutWindowVisible else {
+            return
+        }
+        let nsAlert = NSAlert()
+        nsAlert.messageText = title
+        nsAlert.informativeText = message
+        nsAlert.alertStyle = .warning
+        nsAlert.runModal()
+    }
+
+    private var isLoadoutWindowVisible: Bool {
+        NSApp.windows.contains { window in
+            window.isVisible && window.title == LoadoutAppInfo.name
+        }
     }
 }
