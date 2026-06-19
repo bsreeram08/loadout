@@ -83,24 +83,27 @@ struct ManageView: View {
         ) {
             ScrollView {
                 VStack(spacing: 6) {
-                if let registry = model.context?.registry, !registry.isEmpty {
-                    ForEach(registry, id: \.service) { entry in
+                    if let registry = model.context?.registry, !registry.isEmpty {
+                        ForEach(registry, id: \.service) { entry in
                             Button {
                                 model.manageSelection = entry.service
                             } label: {
                                 ManageServiceRow(
-                            service: entry.service,
+                                    service: entry.service,
                                     selectedVariant: model.selectedVariant(for: entry.service),
                                     isSelected: model.manageSelection == entry.service
-                        )
+                                )
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
                             .buttonStyle(.plain)
+                        }
+                    } else {
+                        Text("No services — import from .zshrc or add one.")
+                            .foregroundStyle(.secondary)
                     }
-                } else {
-                    Text("No services — import from .zshrc or add one.")
-                        .foregroundStyle(.secondary)
                 }
-            }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         } detail: {
             detailPane
@@ -268,6 +271,7 @@ private struct ManageServiceRow: View {
             isSelected ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.55) : .clear,
             in: RoundedRectangle(cornerRadius: 8)
         )
+        .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -311,44 +315,52 @@ private struct ManageServiceDetail: View {
                 }
 
                 LoadoutCardSection(title: "Selection") {
-                        if entry.variants.isEmpty {
-                            Text("No variants stored for this service.")
-                                .foregroundStyle(.secondary)
-                        } else {
+                    if entry.variants.isEmpty {
+                        Text("No variants stored for this service.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        LoadoutRow {
+                            Text("Variant")
+                                .font(.body.weight(.medium))
+                            Spacer()
                             Picker("Variant", selection: $draftVariant) {
                                 ForEach(entry.variants, id: \.self) { variant in
                                     Text(variant).tag(variant)
                                 }
                             }
+                            .labelsHidden()
                             .onChange(of: draftVariant) { _, newValue in
                                 Task { @MainActor in
                                     guard !newValue.isEmpty, isSelectedForExport else { return }
                                     model.select(service: entry.service, variant: newValue)
                                 }
                             }
-
-                            if isSelectedForExport {
-                                Text("Changing the Variant updates the Selection immediately.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Label(
-                                        "Browsing stored variables only. This Service is not part of the Active set yet.",
-                                        systemImage: "info.circle"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-
-                                    Button("Select \(draftVariant) for export") {
-                                        model.select(service: entry.service, variant: draftVariant)
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(draftVariant.isEmpty)
-                                }
-                            }
                         }
 
+                        if isSelectedForExport {
+                            Label("Changing the Variant updates the Selection immediately.", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Label(
+                                "Browsing stored variables only. This Service is not part of the Active set yet.",
+                                systemImage: "info.circle"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                            LoadoutActionRow(
+                                title: "Select \(draftVariant) for export",
+                                subtitle: "Add this Service and Variant to the Active set used by new terminals.",
+                                systemImage: "checkmark.circle",
+                                isDisabled: draftVariant.isEmpty
+                            ) {
+                                model.select(service: entry.service, variant: draftVariant)
+                            }
+                        }
+                    }
+
+                    LoadoutRow {
                         Toggle(
                             "Include in Active set",
                             isOn: Binding(
@@ -362,65 +374,66 @@ private struct ManageServiceDetail: View {
                                 }
                             )
                         )
+                    }
 
-                        if draftVariant == "prod" {
-                            Label("Prod variant — double-check before exporting", systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        }
+                    if draftVariant == "prod" {
+                        Label("Prod variant — double-check before exporting", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
                 }
 
                 LoadoutCardSection(title: "Variants") {
-                        ForEach(entry.variants, id: \.self) { variant in
+                    ForEach(entry.variants, id: \.self) { variant in
                         LoadoutRow {
-                                Text(variant)
-                                Spacer()
-                                Text("\(entry.variableCounts[variant] ?? 0) vars")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                if entry.variants.count > 1 {
-                                    Button(role: .destructive) {
-                                        deleteConfirmation = .variant(service: entry.service, variant: variant)
-                                    } label: {
-                                        Image(systemName: "trash")
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help("Delete variant")
+                            Text(variant)
+                            Spacer()
+                            Text("\(entry.variableCounts[variant] ?? 0) vars")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if entry.variants.count > 1 {
+                                Button(role: .destructive) {
+                                    deleteConfirmation = .variant(service: entry.service, variant: variant)
+                                } label: {
+                                    Image(systemName: "trash")
                                 }
+                                .buttonStyle(.borderless)
+                                .help("Delete variant")
                             }
                         }
-                        Button("Add variant…", action: onAddVariant)
+                    }
+                    Button("Add variant…", action: onAddVariant)
                 }
 
                 LoadoutCardSection(title: "Variables", subtitle: draftVariant) {
-                        if variableNames.isEmpty {
-                            Text("No variables stored for this variant.")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(variableNames, id: \.self) { name in
-                                VariableRow(
-                                    name: name,
-                                    service: entry.service,
-                                    variant: draftVariant,
-                                    model: model,
-                                    onEdit: { onEditVariable(name) },
-                                    onDelete: {
-                                        deleteConfirmation = .variable(
-                                            service: entry.service,
-                                            variant: draftVariant,
-                                            name: name
-                                        )
-                                    }
-                                )
-                            }
+                    if variableNames.isEmpty {
+                        Text("No variables stored for this variant.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(variableNames, id: \.self) { name in
+                            VariableRow(
+                                name: name,
+                                service: entry.service,
+                                variant: draftVariant,
+                                model: model,
+                                onEdit: { onEditVariable(name) },
+                                onDelete: {
+                                    deleteConfirmation = .variable(
+                                        service: entry.service,
+                                        variant: draftVariant,
+                                        name: name
+                                    )
+                                }
+                            )
                         }
-                        Button("Add variable…", action: onAddVariable)
+                    }
+                    Button("Add variable…", action: onAddVariable)
                 }
 
                 LoadoutCardSection(title: "Danger zone") {
-                        Button("Delete service…", role: .destructive) {
-                            deleteConfirmation = .service(entry.service)
-                        }
+                    Button("Delete service…", role: .destructive) {
+                        deleteConfirmation = .service(entry.service)
+                    }
                 }
             }
         }
