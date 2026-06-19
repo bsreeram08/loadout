@@ -4,6 +4,22 @@ All notable changes to Loadout are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Versions use `MAJOR.MINOR.PATCH.MICRO`.
 
+## [0.3.0.0] - 2026-06-19
+
+### Added
+
+- **Active-set strip** — the Services tab now shows, at a glance, how many services and variables are active, a prod-active warning, and a one-click **Copy export** that puts the current shell export on the clipboard
+- **Variant color semantics** — every variant reads as a color everywhere it appears (prod = red, test = blue, beta = purple, stage = orange, dev = teal), so a dangerous prod selection is obvious in the sidebar, the detail pane, and the menu bar
+- **Searchable services sidebar** — filter the full catalog and see it grouped into Active and Inactive with status dots and variant pills
+- **Liquid Glass** — on macOS 26+ the variant selector, action buttons, cards, and menu bar popover render with the system Liquid Glass material, falling back to translucent materials on earlier macOS
+- **UI redesign mockup** — `design/loadout-mockup.html` documents the target design (light + dark)
+
+### Changed
+
+- **Services detail pane rebuilt** — the four overlapping cards (Selection / Variants / Variables / Danger) collapse into one pane: an Active switch, a segmented variant selector, a clean variables table, and a quiet danger row
+- **Menu bar dropdown redesigned** — the menu bar now opens a real popover (`MenuBarExtra` window style) with an active count, prod warning banner, and color-coded active rows that switch variants inline
+- Removed the redundant "Services" header that duplicated the window's section picker
+
 ## [0.2.0.4] - 2026-06-19
 
 ### Added
