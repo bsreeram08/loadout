@@ -2,7 +2,7 @@
 
 Local-first macOS tool for **per-service environment profiles**. Toggle each service's variant independently (e.g. Worldline → prod, Bambora → test), keep secrets encrypted in the macOS Keychain, and load the active set into new terminal sessions.
 
-**Current version:** `0.2.0.4`
+**Current version:** `0.3.0.0`
 
 ```
 Menu bar (compact)          Main window (full catalog)
