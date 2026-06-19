@@ -573,6 +573,7 @@ private struct VariableRow: View {
                     name: name
                 )
                 await MainActor.run {
+                    bringLoadoutForward()
                     revealedValue = value ?? ""
                     if value == nil {
                         loadError = "Could not read value. Unlock the loadout keychain and try again."
@@ -584,6 +585,7 @@ private struct VariableRow: View {
                 }
             } catch {
                 await MainActor.run {
+                    bringLoadoutForward()
                     if KeychainAuthenticator.isUserCancellation(error) {
                         loadError = "Authentication cancelled. Retry reveal and authenticate to show this value."
                         isRevealed = true
@@ -610,5 +612,12 @@ private struct VariableRow: View {
         guard let revealedValue else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(revealedValue, forType: .string)
+    }
+
+    private func bringLoadoutForward() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows
+            .first { $0.title == LoadoutAppInfo.name }
+            .map { $0.makeKeyAndOrderFront(nil) }
     }
 }
