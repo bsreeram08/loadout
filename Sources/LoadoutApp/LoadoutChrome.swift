@@ -262,6 +262,7 @@ struct LoadoutCardSection<Content: View>: View {
 
                 content()
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -311,8 +312,9 @@ struct LoadoutActionRow: View {
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.quaternary.opacity(isDisabled ? 0.14 : 0.28), in: RoundedRectangle(cornerRadius: 8))
-            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: 8))
         .buttonStyle(.plain)
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.72 : 1)
